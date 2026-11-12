@@ -74,6 +74,20 @@ If the table's keys are wrong, every checkpoint write fails, and the agent start
 
 The key **types** are right (both String). The key **names** are wrong. The table uses a hand-designed "session + time" model, while the library uses generic single-table `PK`/`SK`. DynamoDB can't rename key attributes, so **create `agent-checkpoints`**.
 
+### ✔️ Confirmed from the agent code (`insightflow-agent` handler)
+
+The handler is copied to [assets/challenge_B/code/original_agent_langgraph_orchestrator.py](assets/challenge_B/code/original_agent_langgraph_orchestrator.py). It came from the vault root after the lab.
+
+| Code fact | What it means |
+|---|---|
+| `CHECKPOINT_TABLE = os.environ.get("CHECKPOINT_TABLE_NAME", "agent-checkpoints")` | The env var **overrides** the right default. Setup set it to `agent-state`, which broke memory |
+| `REGION = os.environ.get("AWS_REGION_OVERRIDE", "us-east-1")` → `DynamoDBSaver(table_name=CHECKPOINT_TABLE, region_name=REGION)` | Both env vars go straight into the saver, so the fix was two env var values |
+| No `ttl_seconds` passed to `DynamoDBSaver` | Items are written **without** a `ttl` value, so they never expire, even though TTL is enabled on `ttl`. Enabling TTL (the task criterion) only takes effect if the code passes `ttl_seconds=…`. That's a good design-review point |
+| `thread_id = body.get("thread_id") or f"thread_{int(time.time())}"` | Memory only works if the **client sends the same `thread_id`** each turn. Without one, every message gets a new thread, so it looks like "no memory" even when the table is right |
+| The code comment links the AWS docs page `ddb-langgraph-checkpoint.html` (DynamoDB Developer Guide) | The authoritative schema source the task meant. The library's CloudFormation template agrees: `PK`/`SK`/`ttl` |
+| `graph.compile(checkpointer=checkpointer)` with `config = {"configurable": {"thread_id": thread_id}}` | The standard LangGraph persistence pattern (Study note 1) |
+| Other env vars: `MODEL_ID` (default `us.amazon.nova-pro-v1:0`), `AURORA_TOOL_FUNCTION`, `KB_RETRIEVE_FUNCTION` | The agent calls the D and F tool Lambdas by name. Nova Pro through a **cross-Region inference profile** (`us.` prefix) |
+
 ### The required table, from the library's docs
 
 Source: `langgraph-checkpoint-aws` **1.2.7** README → linked CloudFormation template `samples/memory/cfn/langgraph-ddb-cfn-template.yaml` (checked 12 Nov 2026):

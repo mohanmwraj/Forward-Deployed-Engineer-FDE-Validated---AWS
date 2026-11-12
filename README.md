@@ -11,8 +11,9 @@
 |---|---|---|---|---|
 | 01 | [AWS Data Lakehouse Demonstrated](01_AWS_Data_Lakehouse_Demonstrated/README.md) | Glue, Iceberg, Athena, Lake Formation, Firehose, Step Functions | A ✅ · B ✅ · C ✅ · D ✅ · E ✅ · F ✅ · G ⚠️ | ✅ **PASSED** 11 Nov 2026 · valid to 11 Nov 2027 · renew from 8 Aug 2027 |
 | 02 | [AWS Databases for Agentic AI Demonstrated](02_AWS_Databases_For_Agentic_AI_Demonstrated/README.md) | Aurora PostgreSQL + pgvector, DynamoDB (agent memory), Bedrock Knowledge Bases, MCP servers, Lambda | A ✅ · B ✅ · C ✅ · D ✅ · E ✅ · F ✅ · G ✅ | ✅ **PASSED** 12 Nov 2026 · valid to 12 Nov 2027 · renew from 9 Aug 2027 |
+| 03 | [AWS Agentic AI Demonstrated](03_AWS_Agentic_AI_Demonstrated/README.md) | Bedrock AgentCore (Runtime, Gateway, Memory), Guardrails, Cognito OAuth 2.0, OpenSearch Serverless KB, Lambda, VPC | A ⬜ · B ⬜ · C ⬜ · D ⬜ · E ⬜ · F ⬜ | 🟡 in progress (started 13 Nov 2026) |
 
-_New labs are added as `03_<Lab_Name>/`, `04_<Lab_Name>/` and so on._
+_New labs are added as `04_<Lab_Name>/`, `05_<Lab_Name>/` and so on._
 
 ---
 
@@ -50,10 +51,20 @@ AWS_Partner_FDE_Challenges_Vault/
 │       ├── challenge_E/
 │       ├── challenge_F/
 │       └── challenge_G/
-└── 02_AWS_Databases_For_Agentic_AI_Demonstrated/
-    ├── README.md .................................... scope + HLD + challenge tracker
+├── 02_AWS_Databases_For_Agentic_AI_Demonstrated/
+│   ├── README.md .................................... result + resources + HLD + tracker
+│   ├── Challenge_A_Product_Search_pgvector_Operator_Class_And_Composite_Index.md
+│   ├── Challenge_B_DynamoDB_Agent_Memory_LangGraph_Checkpointer_Table.md
+│   ├── Challenge_C_DynamoDB_MCP_Server_Region_Tables_Tool_Definitions.md
+│   ├── Challenge_D_Aurora_Query_Tool_Least_Privilege_Secret_SSL_And_Summary_View.md
+│   ├── Challenge_E_pgvector_Document_Embeddings_Table_HNSW_And_GIN_Indexes.md
+│   ├── Challenge_F_Bedrock_Knowledge_Base_On_Aurora_S3_Data_Sources_Sync.md
+│   ├── Challenge_G_Aurora_MCP_Server_Agent_Credentials_And_Explain_Query_Tool.md
+│   └── assets/ .................................. HLD, exam result, challenge_<X>/ screenshots + code/
+└── 03_AWS_Agentic_AI_Demonstrated/
+    ├── README.md .................................... scope + resources + time plan + tracker
     ├── Challenge_<X>_<Short_Title>.md ............... one per challenge, added as I go
-    └── assets/ ...................................... 00_architecture_hld.png + challenge_<X>/ screenshots
+    └── assets/
 ```
 
 Every challenge file follows the same layout:
