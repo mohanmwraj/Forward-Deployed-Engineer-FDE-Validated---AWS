@@ -49,6 +49,7 @@ _Add the result screenshot as `assets/00_exam_result.png` when I have it._
 - **DynamoDB MCP server:** env vars `AWS_REGION_OVERRIDE`, `TABLE_NAMES` (allow-list: `user-sessions`, `agent-checkpoints`). Tool catalog in the bundled `tool_definitions.json` (`describe_table`, `sample_items`, `analyze_access_patterns`, …). Table `user-sessions` is pre-built *(Challenge C)*
 - **Aurora query tool Lambda:** env vars `AURORA_CLUSTER_ARN`, `DB_NAME`, `SSL_MODE`, `DB_PASSWORD` (plaintext, remove it), `DB_PASSWORD_SECRET_ARN`. **Three secrets** with prefix `insightflow/aurora-`: `admin-creds` (DDL), **`agent-creds` (read-only, for the agent tools)** and `kb-creds` (Bedrock KB writer, never retrieved as of D, a clue for F). DB role **`agent_readonly`**. Table `customers` (`region`, `total_orders` = spend, `order_count`, `last_purchase`). View `customer_summary` *(Challenge D)*
 - **KB vector table:** `public.document_embeddings` (`id uuid PK default gen_random_uuid()`, `content text`, `embedding vector(1024)`, `metadata jsonb`, `created_at timestamptz`). HNSW `vector_cosine_ops` + GIN `to_tsvector('english', content)`. Embedding model **Titan Text Embeddings V2 (1024-d)** *(Challenge E)*
+- **Knowledge Base:** IAM role `insightflow-kb-role`, secret `insightflow/aurora-kb-creds`, bucket `insightflow-documents-…` with `policies/`, `product-catalogs/`, `internal-memos/` (exclude), `archived/` (exclude). Retrieval Lambda env var `KNOWLEDGE_BASE_ID`. KB ID: _fill in_ *(Challenge F)*
 
 **Not in the panel. Find these in the console when a challenge needs them:**
 - the DynamoDB table name(s)
@@ -110,7 +111,7 @@ The lettered circles on the diagram mark where each challenge happens. I'll conf
 | **C** | **AWS Lambda (DynamoDB MCP Server)** | Developers/DBAs → *Invoke tools* → MCP server → *Inspect tables* → DynamoDB | ✔️ **Confirmed:** Region + `TABLE_NAMES` env vars, `max_results` type and missing `analyze_access_patterns` in `tool_definitions.json` |
 | **D** | **Lambda function (query customers)** | LangGraph agent → *Query customers* → this Lambda → *Query data* → Aurora; *Write logs* → CloudWatch | ✔️ **Confirmed:** fix the tool Lambda env vars (cluster ARN, `DB_NAME`, `SSL_MODE=require`, read-only secret, remove `DB_PASSWORD`) + `customer_summary` view + `GRANT SELECT` to `agent_readonly` |
 | **E** | **Aurora (pgvector)**, the *Store vectors* target, next to the *Get credentials* arrow | Secrets Manager → credentials → Aurora access | ✔️ **Confirmed:** create `document_embeddings` (Bedrock KB schema, `vector(1024)`) + HNSW cosine index + GIN full-text index |
-| **F** | **S3 bucket → Amazon Bedrock Knowledge Bases**, on the *Ingest docs* arrow | Docs in S3 → ingest (sync) → chunk + embed → store vectors in Aurora | KB data source, sync/ingestion, the pgvector table KB writes to |
+| **F** | **S3 bucket → Amazon Bedrock Knowledge Bases**, on the *Ingest docs* arrow | Docs in S3 → ingest (sync) → chunk + embed → store vectors in Aurora | ✔️ **Confirmed:** create the KB on Aurora (`public.document_embeddings`), role `insightflow-kb-role`, secret `aurora-kb-creds`, data sources `policies/` + `product-catalogs/` only, sync, set `KNOWLEDGE_BASE_ID` |
 | **G** | **Lambda function (Aurora MCP Server)** | Developers/DBAs → *Invoke tools* → MCP server → *Query data* → Aurora | MCP server config so DBAs can debug the agent's SQL |
 
 ### The three paths through the diagram
@@ -148,7 +149,7 @@ The lettered circles on the diagram mark where each challenge happens. I'll conf
 | C | Configure the DynamoDB MCP server for state inspection | Lambda (env vars, Code tab, Deploy, test events), MCP `tool_definitions.json` (JSON Schema), DynamoDB DescribeTable | 🟡 In progress | [Challenge_C](Challenge_C_DynamoDB_MCP_Server_Region_Tables_Tool_Definitions.md) |
 | D | Configure Amazon Aurora PostgreSQL for agent access | Lambda env vars (cluster ARN, DB_NAME, SSL_MODE), Secrets Manager (read-only secret), PostgreSQL view + GRANT, CloudWatch | 🟡 In progress | [Challenge_D](Challenge_D_Aurora_Query_Tool_Least_Privilege_Secret_SSL_And_Summary_View.md) |
 | E | Configure pgvector for document retrieval | Aurora + pgvector (`document_embeddings`, `vector(1024)`, HNSW `vector_cosine_ops`), PostgreSQL FTS (GIN `to_tsvector`), Bedrock KB schema | 🟡 In progress | [Challenge_E](Challenge_E_pgvector_Document_Embeddings_Table_HNSW_And_GIN_Indexes.md) |
-| F | _Knowledge Base ingestion_ | S3, Bedrock Knowledge Bases, Aurora pgvector | ⬜ | |
+| F | Implement Amazon Bedrock Knowledge Bases with Aurora | Bedrock KB (vector store = Aurora, field mapping `id/embedding/content/metadata`), S3 data sources `policies/` + `product-catalogs/`, sync, Lambda `KNOWLEDGE_BASE_ID` | 🟡 In progress | [Challenge_F](Challenge_F_Bedrock_Knowledge_Base_On_Aurora_S3_Data_Sources_Sync.md) |
 | G | _Aurora MCP server_ | Lambda, MCP, Aurora | ⬜ | |
 
 _Rows A–G are placeholders keyed to the diagram labels. I'll rename each one when I see its task card._
@@ -167,6 +168,7 @@ Each challenge file uses the same layout as Lab 01: status checklist → task ca
 ├── Challenge_C_DynamoDB_MCP_Server_Region_Tables_Tool_Definitions.md
 ├── Challenge_D_Aurora_Query_Tool_Least_Privilege_Secret_SSL_And_Summary_View.md
 ├── Challenge_E_pgvector_Document_Embeddings_Table_HNSW_And_GIN_Indexes.md
+├── Challenge_F_Bedrock_Knowledge_Base_On_Aurora_S3_Data_Sources_Sync.md
 ├── Challenge_<X>_<Short_Title>.md ............ one file per challenge, added as I post them
 └── assets/
     ├── 00_architecture_hld.png ............... shared architecture diagram
@@ -175,6 +177,7 @@ Each challenge file uses the same layout as Lab 01: status checklist → task ca
     ├── challenge_C/ .......................... screenshots + code for Challenge C
     ├── challenge_D/ .......................... screenshots for Challenge D
     ├── challenge_E/ .......................... screenshots for Challenge E
+    ├── challenge_F/ .......................... screenshots for Challenge F
     └── challenge_<X>/ ........................ screenshots for each challenge
 ```
 
