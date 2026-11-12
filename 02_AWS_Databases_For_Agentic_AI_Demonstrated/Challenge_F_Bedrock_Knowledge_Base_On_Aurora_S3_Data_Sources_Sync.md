@@ -1,6 +1,6 @@
 # 🅵 Challenge F: Implement Amazon Bedrock Knowledge Bases with Aurora
 
-> **Status:** 🟡 In progress · **Diagram label:** F (S3 bucket → *Ingest docs* → Amazon Bedrock Knowledge Bases → *Store vectors* → Aurora pgvector; agent → kb-retrieve-tool → *Retrieve docs*)
+> **Status:** ✅ Passed, *Meets Requirements* (exam lab, 12 Nov 2026) · **Diagram label:** F (S3 bucket → *Ingest docs* → Amazon Bedrock Knowledge Bases → *Store vectors* → Aurora pgvector; agent → kb-retrieve-tool → *Retrieve docs*)
 > **Services:** Amazon Bedrock Knowledge Bases (vector store = Aurora, field mapping, data sources, sync), Amazon Titan Text Embeddings V2, Amazon S3 (prefixes), IAM service role, Secrets Manager, Aurora PostgreSQL (RDS Data API), AWS Lambda (env var)
 > **Lab:** [AWS Databases for Agentic AI Demonstrated](README.md) · **Vault:** [index](../README.md)
 
@@ -8,10 +8,10 @@
 
 ## ✅ Status checklist (success criteria)
 
-- [ ] A Bedrock **knowledge base** exists with **Amazon Aurora (RDS)** as the vector store, with **field mappings matching `document_embeddings`**
-- [ ] It uses the **pre-created IAM role** (`insightflow-kb-role`) and the **correct DB credentials secret** (`insightflow/aurora-kb-creds`)
-- [ ] It has data sources for the **`/policies/`** and **`/product-catalogs/`** S3 prefixes, and **every data source has completed a successful sync**
-- [ ] Lambda `insightflow-kb-retrieve-tool`'s **`KNOWLEDGE_BASE_ID`** is set to the KB ID
+- [x] A Bedrock **knowledge base** exists with **Amazon Aurora (RDS)** as the vector store, with **field mappings matching `document_embeddings`**
+- [x] It uses the **pre-created IAM role** (`insightflow-kb-role`) and the **correct DB credentials secret** (`insightflow/aurora-kb-creds`)
+- [x] It has data sources for the **`/policies/`** and **`/product-catalogs/`** S3 prefixes, and **every data source has completed a successful sync**
+- [x] Lambda `insightflow-kb-retrieve-tool`'s **`KNOWLEDGE_BASE_ID`** is set to the KB ID
 - [ ] *(Optional)* The Bedrock console **Test** window returns relevant chunks
 - [ ] *(Optional)* `SELECT COUNT(*) FROM document_embeddings;` returns **> 0**
 

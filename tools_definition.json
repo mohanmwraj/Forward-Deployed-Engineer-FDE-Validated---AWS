@@ -1,33 +1,29 @@
 [
   {
-    "name": "describe_table",
-    "description": "Get schema details for a DynamoDB table",
+    "name": "query",
+    "description": "Execute a SQL query against the Aurora PostgreSQL database",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "table_name": {
+        "query_text": {
           "type": "string",
-          "description": "Name of the table"
+          "description": "The SQL query to execute"
         }
       },
       "required": [
-        "table_name"
+        "query_text"
       ]
     }
   },
   {
-    "name": "sample_items",
-    "description": "Scan a few items from a DynamoDB table",
+    "name": "describe_table",
+    "description": "Get column details for a specific table",
     "inputSchema": {
       "type": "object",
       "properties": {
         "table_name": {
           "type": "string",
-          "description": "Name of the table"
-        },
-        "max_results": {
-          "type": "string",
-          "description": "Maximum items to return"
+          "description": "Name of the table to describe"
         }
       },
       "required": [
@@ -37,7 +33,7 @@
   },
   {
     "name": "list_tables",
-    "description": "List configured DynamoDB tables",
+    "description": "List all tables in the public schema",
     "inputSchema": {
       "type": "object",
       "properties": {}

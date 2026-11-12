@@ -1,6 +1,6 @@
 # 🅲 Challenge C: Configure the DynamoDB MCP server for state inspection
 
-> **Status:** 🟡 In progress · **Diagram label:** C (AWS Lambda *DynamoDB MCP Server*, on Developers/DBAs → *Invoke tools* → *Inspect tables* → DynamoDB)
+> **Status:** ✅ Passed, *Meets Requirements* (exam lab, 12 Nov 2026) · **Diagram label:** C (AWS Lambda *DynamoDB MCP Server*, on Developers/DBAs → *Invoke tools* → *Inspect tables* → DynamoDB)
 > **Services:** AWS Lambda (env vars, Code tab, **Deploy**, test events), Model Context Protocol (MCP) tool catalog (`tool_definitions.json`, JSON Schema), Amazon DynamoDB (`DescribeTable`, GSIs, TTL), CloudWatch Logs
 > **Lab:** [AWS Databases for Agentic AI Demonstrated](README.md) · **Vault:** [index](../README.md)
 
@@ -8,9 +8,9 @@
 
 ## ✅ Status checklist (success criteria)
 
-- [ ] The MCP server is configured for the **correct AWS Region**, and its **table list** references the required tables (`user-sessions`, `agent-checkpoints`)
-- [ ] The `sample_items` tool's **`max_results`** parameter is declared with the **correct type**
-- [ ] The **`analyze_access_patterns`** tool is in the tool catalog, with a **`table_name`** parameter
+- [x] The MCP server is configured for the **correct AWS Region**, and its **table list** references the required tables (`user-sessions`, `agent-checkpoints`)
+- [x] The `sample_items` tool's **`max_results`** parameter is declared with the **correct type**
+- [x] The **`analyze_access_patterns`** tool is in the tool catalog, with a **`table_name`** parameter
 - [ ] *(Optional self-check)* Test payload `describe_table` on `user-sessions` returns its key schema + GSI
 - [ ] *(Optional self-check)* Test payload `analyze_access_patterns` on `user-sessions` returns an analysis of its key schema, indexes and TTL
 

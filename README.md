@@ -10,7 +10,7 @@
 | # | Lab | Focus | Challenges | Status |
 |---|---|---|---|---|
 | 01 | [AWS Data Lakehouse Demonstrated](01_AWS_Data_Lakehouse_Demonstrated/README.md) | Glue, Iceberg, Athena, Lake Formation, Firehose, Step Functions | A ✅ · B ✅ · C ✅ · D ✅ · E ✅ · F ✅ · G ⚠️ | ✅ **PASSED** 11 Nov 2026 · valid to 11 Nov 2027 · renew from 8 Aug 2027 |
-| 02 | [AWS Databases for Agentic AI Demonstrated](02_AWS_Databases_For_Agentic_AI_Demonstrated/README.md) | Aurora PostgreSQL + pgvector, DynamoDB (agent memory), Bedrock Knowledge Bases, MCP servers, Lambda | A 🟡 · B 🟡 · C 🟡 · D 🟡 · E 🟡 · F 🟡 · G 🟡 | 🟡 in progress (started 12 Nov 2026) |
+| 02 | [AWS Databases for Agentic AI Demonstrated](02_AWS_Databases_For_Agentic_AI_Demonstrated/README.md) | Aurora PostgreSQL + pgvector, DynamoDB (agent memory), Bedrock Knowledge Bases, MCP servers, Lambda | A ✅ · B ✅ · C ✅ · D ✅ · E ✅ · F ✅ · G ✅ | ✅ **PASSED** 12 Nov 2026 · valid to 12 Nov 2027 · renew from 9 Aug 2027 |
 
 _New labs are added as `03_<Lab_Name>/`, `04_<Lab_Name>/` and so on._
 
@@ -81,3 +81,9 @@ Every challenge file follows the same layout:
 - **Prefer allow-lists to deny-lists for sensitive data**, so new columns stay hidden by default. *(Lakehouse E)*
 - **Code edits in managed consoles aren't live until you deploy or save** (Lambda **Deploy**, Step Functions **Save**, Glue **Save**). My first Challenge F check failed only because the Lambda wasn't deployed. There's a per-service table under *First-time console gotchas* in [Challenge F](01_AWS_Data_Lakehouse_Demonstrated/Challenge_F_Vendor_File_Pipeline_EventBridge_StepFunctions_Lambda.md). *(Lakehouse A, F)*
 - **Fix the cause and repair the damage as two separate steps.** Fixing the job stops new bad data, and restoring a snapshot removes what's already there. Don't re-run the job between the restore and the check. *(Lakehouse G)*
+- **Check which database user you are before DDL.** In PostgreSQL, schema changes need *ownership*, not GRANTs. Use the admin secret for DDL, and keep the agent secret read-only. *(Agentic DB A)*
+- **Read the real config instead of guessing from examples.** The index opclass decides the vector operator, and the library's docs decide the table keys. Sample queries and `KEY_SCHEMA`-style hints can be decoys. *(Agentic DB A, B)*
+- **Look for missing settings, not just wrong ones.** Add the secret ARN, remove the plaintext password, and fix decoy cluster or DB names. *(Agentic DB D)*
+- **When a handler is available, read it.** It shows exact argument names, parsing (`split(",")` without strip), and errors returned under a green "Succeeded". *(Agentic DB C, G)*
+- **Debug as the agent, never as admin.** Elevated debug credentials hide the permission bugs you are looking for. *(Agentic DB G)*
+- **Scope what an AI agent can read.** Ingest only the folders it should quote. Expose views instead of raw tables, and use read-only roles. *(Agentic DB D, F)*

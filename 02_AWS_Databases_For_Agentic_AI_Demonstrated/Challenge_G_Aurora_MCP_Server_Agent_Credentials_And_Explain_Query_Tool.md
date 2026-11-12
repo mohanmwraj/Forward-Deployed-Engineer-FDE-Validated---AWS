@@ -1,6 +1,6 @@
 # 🅶 Challenge G: Configure the Aurora MCP server for agent debugging
 
-> **Status:** 🟡 In progress · **Diagram label:** G (Lambda function *Aurora MCP Server*, on Developers/DBAs → *Invoke tools* → MCP server → *Query data* → Aurora)
+> **Status:** ✅ Passed, *Meets Requirements* (exam lab, 12 Nov 2026) · **Diagram label:** G (Lambda function *Aurora MCP Server*, on Developers/DBAs → *Invoke tools* → MCP server → *Query data* → Aurora)
 > **Services:** AWS Lambda (env vars, Code tab, **Deploy**, test events), MCP tool catalog (`tool_definitions.json`, JSON Schema), Secrets Manager (agent vs admin credentials), Aurora PostgreSQL (`EXPLAIN`, `information_schema`), CloudWatch Logs
 > **Lab:** [AWS Databases for Agentic AI Demonstrated](README.md) · **Vault:** [index](../README.md)
 
@@ -8,10 +8,10 @@
 
 ## ✅ Status checklist (success criteria)
 
-- [ ] The MCP server connects with the **same DB credentials as the agent** (`aurora-agent-creds`), **not admin**
-- [ ] `{"method": "tools/list"}` returns **all four tools**: `query`, `list_tables`, `describe_table`, `explain_query`
-- [ ] The **`query`** tool is declared with a **single `sql`** parameter
-- [ ] The **`explain_query`** tool is in the tool catalog
+- [x] The MCP server connects with the **same DB credentials as the agent** (`aurora-agent-creds`), **not admin**
+- [x] `{"method": "tools/list"}` returns **all four tools**: `query`, `list_tables`, `describe_table`, `explain_query`
+- [x] The **`query`** tool is declared with a **single `sql`** parameter
+- [x] The **`explain_query`** tool is in the tool catalog
 - [ ] *(Optional)* `query` → `SELECT * FROM customer_summary WHERE region = 'Pacific'` returns data
 - [ ] *(Optional)* `explain_query` → the same SQL returns an execution plan showing whether an index is used
 - [ ] *(Optional)* `describe_table` → `customer_summary` returns the view's column details
@@ -79,6 +79,21 @@ The C ↔ G parallel:
 
 **Fix:** `SECRET_ARN` = the agent secret · `query` → `{sql: string}` · add `explain_query` → `{sql: string}` · **Deploy**.
 
+### ✔️ Confirmed from the handler code and `tool_definitions.json`
+
+Copies are in [assets/challenge_G/code/](assets/challenge_G/code/): `original_handler_aurora_mcp_server.py`, `original_tool_definitions.json`, `fixed_tool_definitions.json`.
+
+| Code fact (line) | What it means for the fix |
+|---|---|
+| `execute_sql` reads **`AURORA_CLUSTER_ARN`**, **`DB_NAME`**, **`SECRET_ARN`** and calls `rds_data.execute_statement(resourceArn, secretArn, database, sql)` (L22–32) | It uses the **RDS Data API**. The DB user is whoever is in the `SECRET_ARN` secret, so set it to the **agent** secret. Also check that the other two vars aren't the D decoys (`analytics-cluster`, `postgres`) |
+| `query`: `sql_param_name = list(schema_props.keys())[0]` → `arguments.get(sql_param_name)` (L72–74) | **The handler takes the argument name from the catalog's first property.** The catalog says **`query_text`** (original L8), so a call sending `"sql"` gives `Missing 'query_text' parameter`. Rename it to **`sql`** |
+| `explain_query` exists in the handler and reads its argument name the same way, then runs `f"EXPLAIN {sql}"` (L93–101) | Add a catalog entry whose **first and only property is `sql`**. Plain `EXPLAIN` (no `ANALYZE`) only plans, so it's safe |
+| `tool = next(... if t["name"] == tool_name)` → `Tool not found` (L65–67) | A missing catalog entry means the tool can't be called, as in Challenge C |
+| `describe_table` → `information_schema.columns WHERE table_name = '{table_name}'` (L84) | Works for **views** too (`customer_summary`), but only shows columns the **current user** has privileges on, which is another reason to run as the agent. ⚠️ It's an f-string, so it's **SQL-injectable** (see Study note 4) |
+| `list_tables` → `information_schema.tables WHERE table_schema = 'public'` (L89) | Includes **views**, and only objects the agent user can access. That's exactly "what the agent can see" |
+| Errors are returned as `{"error": "…"}` (L67, L76, L107) | A Lambda test shows **Succeeded** even when the tool failed, so read the body |
+| The catalog is a **bare JSON array** with **`inputSchema`** (camelCase) | The new tool follows the same shape |
+
 ---
 
 ## 🛠️ Solution
@@ -113,7 +128,7 @@ If it fails, finish [Challenge D](Challenge_D_Aurora_Query_Tool_Least_Privilege_
 
 **Where:** Lambda → **`insightflow-aurora-mcp-server-b55df330`** (panel `AuroraMCPFunctionName`) → **Configuration** → **Environment variables**
 
-1. Record all the variables (for the run log). Expect `SECRET_ARN`, plus probably a cluster ARN and DB name. **Check those too**: the cluster must be `insightflow-cluster-b55df330` and the DB `insightflow`. D had a decoy `analytics-cluster` and `postgres`.
+1. Record all the variables (for the run log). ✔️ The handler reads exactly **`AURORA_CLUSTER_ARN`**, **`DB_NAME`** and **`SECRET_ARN`** (L22–24). **Check all three**: the cluster must be `…:cluster:insightflow-cluster-b55df330` and the DB `insightflow` (D had the decoys `analytics-cluster` and `postgres`). The task card only names `SECRET_ARN` as wrong, but a decoy in the other two would break every tool.
 2. **Edit** → set:
 
    | Key | New value |
@@ -133,7 +148,7 @@ If it fails, finish [Challenge D](Challenge_D_Aurora_Query_Tool_Least_Privilege_
    | Search for | What to note |
    |---|---|
    | `SECRET_ARN` | How it's used, e.g. `rds-data execute_statement(resourceArn=…, secretArn=os.environ["SECRET_ARN"], database=…)` |
-   | `"query"` (the tool branch) | **Which argument it reads**: `arguments.get("sql")`. That's the name the schema must use |
+   | `"query"` (the tool branch) | ✔️ It reads the argument named by the **first property in the catalog schema** (L72–74), so the schema must be `{sql}` |
    | `explain_query` | It should exist in the handler (the task says the tool is only missing from the catalog). Note the argument it reads (likely `sql`) and whether it runs `EXPLAIN` or `EXPLAIN ANALYZE` |
    | `describe_table` / `list_tables` | Arguments: `table_name` / none |
    | `tool_definitions` | It's loaded from the bundled file. Does `tools/call` reject tools not in the catalog? (In C it did) |
@@ -143,61 +158,106 @@ If it fails, finish [Challenge D](Challenge_D_Aurora_Query_Tool_Least_Privilege_
    - Find the **`query`** entry and compare its `properties` with what the handler reads. That's the mismatch.
    - Screenshot → `03_tool_definitions_before.png`.
 
-> **Fastest path:** paste the handler and `tool_definitions.json` here (as for Challenge C) and I'll produce the exact fixed file.
+> ✔️ **Done:** handler + catalog reviewed. Copies are in [assets/challenge_G/code/](assets/challenge_G/code/). Findings are under *Confirmed from the handler code* in Root cause.
 
 ### Step 4: Fix the catalog (Lambda → Code tab → `tool_definitions.json`)
 
-#### 4a. Make `query` take a single `sql` parameter
+#### ✔️ The complete fixed `tool_definitions.json` (validated as JSON)
 
-Replace the `query` entry's `inputSchema` so it has **exactly one** property, `sql`. Keep the file's existing key names and the tool's `name`/`description`:
-
-```json
-{
-  "name": "query",
-  "description": "<keep the existing description>",
-  "inputSchema": {
-    "type": "object",
-    "properties": {
-      "sql": {
-        "type": "string",
-        "description": "SQL query to execute"
-      }
-    },
-    "required": [
-      "sql"
-    ]
-  }
-}
-```
-
-Remove any wrong or extra properties (e.g. `"query"`, `"statement"`, `"params"`) and fix `required` to `["sql"]`.
-
-#### 4b. Add `explain_query` by copying the fixed `query` entry
-
-1. Copy the whole fixed `query` object.
-2. Paste it as a **new array element**: add a **comma** after the previous element's closing `}`.
-3. In the copy, change only `name` and `description`:
+In the Code tab, open **`tool_definitions.json`**. Keep that exact name, because the handler opens it at L15. Press **Ctrl+A** → paste → **Ctrl+S** → **Deploy**. Same file: [fixed_tool_definitions.json](assets/challenge_G/code/fixed_tool_definitions.json).
 
 ```json
-{
-  "name": "explain_query",
-  "description": "Show the PostgreSQL execution plan for a SQL query, including whether indexes are used",
-  "inputSchema": {
-    "type": "object",
-    "properties": {
-      "sql": {
-        "type": "string",
-        "description": "SQL query to explain"
-      }
-    },
-    "required": [
-      "sql"
-    ]
+[
+  {
+    "name": "query",
+    "description": "Execute a SQL query against the Aurora PostgreSQL database",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "sql": {
+          "type": "string",
+          "description": "The SQL query to execute"
+        }
+      },
+      "required": [
+        "sql"
+      ]
+    }
+  },
+  {
+    "name": "describe_table",
+    "description": "Get column details for a specific table",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "table_name": {
+          "type": "string",
+          "description": "Name of the table to describe"
+        }
+      },
+      "required": [
+        "table_name"
+      ]
+    }
+  },
+  {
+    "name": "list_tables",
+    "description": "List all tables in the public schema",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "explain_query",
+    "description": "Show the PostgreSQL execution plan (EXPLAIN) for a SQL query, including whether indexes are used",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "sql": {
+          "type": "string",
+          "description": "The SQL query to explain"
+        }
+      },
+      "required": [
+        "sql"
+      ]
+    }
   }
-}
+]
 ```
 
-If the handler's `explain_query` branch reads a different argument name, use **that** name. The handler is the source of truth.
+**Diff against the original**: only two changes.
+
+```diff
+       "properties": {
+-        "query_text": {
++        "sql": {
+           "type": "string",
+           "description": "The SQL query to execute"
+         }
+       },
+       "required": [
+-        "query_text"
++        "sql"
+       ]
+ ...
+       "properties": {}
+     }
+-  }
++  },
++  {
++    "name": "explain_query",
++    "description": "Show the PostgreSQL execution plan (EXPLAIN) for a SQL query, including whether indexes are used",
++    "inputSchema": { "type": "object",
++      "properties": { "sql": { "type": "string", "description": "The SQL query to explain" } },
++      "required": [ "sql" ] }
++  }
+ ]
+```
+
+- **Why `sql` and not `query_text`:** the handler takes the argument name from the **first property in the schema** (L72–74 for `query`, L94–96 for `explain_query`). With `query_text`, the task's payload `{"sql": …}` gives `{"error": "Missing 'query_text' parameter"}`.
+- **Why `explain_query` must also use `sql`, as its first and only property:** for the same reason. The test payload sends `"sql"`, and the handler would look for whatever key comes first in the schema.
 
 **JSON pitfalls** (from C):
 - a missing comma between elements
@@ -218,7 +278,7 @@ For each one: **Create new event** → name → paste the JSON → **Save** → 
 |---|---|---|
 | `toolsList` | `{"method": "tools/list"}` | **4** tools: `query`, `list_tables`, `describe_table`, `explain_query`. `query` has only `sql` |
 | `queryPacific` | `{"method": "tools/call", "params": {"name": "query", "arguments": {"sql": "SELECT * FROM customer_summary WHERE region = 'Pacific'"}}}` | One row (region, customer_count, total_orders, avg_orders, most_recent_purchase) |
-| `explainPacific` | `{"method": "tools/call", "params": {"name": "explain_query", "arguments": {"sql": "SELECT * FROM customer_summary WHERE region = 'Pacific'"}}}` | A plan, e.g. `GroupAggregate`/`HashAggregate` → **`Seq Scan on customers`** with `Filter: (region = 'Pacific')`, or an `Index Scan` if `customers(region)` is indexed |
+| `explainPacific` | `{"method": "tools/call", "params": {"name": "explain_query", "arguments": {"sql": "SELECT * FROM customer_summary WHERE region = 'Pacific'"}}}` | Rows like `[{"QUERY PLAN": "GroupAggregate …"}, {"QUERY PLAN": "  ->  Seq Scan on customers …"}, {"QUERY PLAN": "        Filter: (region = 'Pacific'::text)"}]`. That's **Seq Scan** (no index on `region`), or an `Index Scan` if one exists |
 | `describeSummary` | `{"method": "tools/call", "params": {"name": "describe_table", "arguments": {"table_name": "customer_summary"}}}` | Columns + types: `region` (text/varchar), `customer_count` (bigint), `total_orders` (numeric), `avg_orders` (numeric), `most_recent_purchase` (date/timestamp) |
 | `listTables` | `{"method": "tools/call", "params": {"name": "list_tables", "arguments": {}}}` | The tables (and maybe views) the **agent user** can see |
 
@@ -259,7 +319,9 @@ _Fill in as I go. Screenshots go in `assets/challenge_G/`._
 |---|---|---|
 | `tools/list` shows 3 tools | `explain_query` not added, or added but **not deployed** | Add it → Ctrl+S → **Deploy** |
 | Every tool fails / JSON parse error at load | Invalid `tool_definitions.json` (comma) | Fix the syntax → Deploy |
-| `query` → *missing 'sql'* / empty result | The catalog still declares another parameter name, or the test sends a different key | Schema `{sql}` only. The test uses `"arguments": {"sql": …}` |
+| `{"error": "Missing 'query_text' parameter"}` | The catalog still declares `query_text`. The handler reads the **first schema property** as the argument name (L72–74) | Rename it to `sql` → **Deploy** |
+| `{"error": "Missing '<x>' parameter"}` on `explain_query` | The `explain_query` schema's first property isn't `sql` (L94–96) | Its only property must be `sql` |
+| `{"error": "Tool not found: explain_query"}` | Not in the catalog, or not deployed (L65–67) | Add it → **Deploy** |
 | `query` → `permission denied for view customer_summary` **after** switching to the agent secret | **That's the point of G:** the agent user lacks the GRANT (Challenge D, Step 5.3) | `GRANT SELECT ON public.customer_summary TO agent_readonly;` (as admin in the Query editor) |
 | `AccessDeniedException … secretsmanager:GetSecretValue` | `SECRET_ARN` is a secret this Lambda's role can't read, or a partial ARN | The full agent secret ARN (copy it from the query tool's env var) |
 | `BadRequestException` / *database does not exist* | The MCP server's cluster/DB env vars point to the decoy (`analytics-cluster`, `postgres`) ⚠️ | `insightflow-cluster-b55df330`, `insightflow` |
@@ -303,6 +365,16 @@ _Fill in as I go. Screenshots go in `assets/challenge_G/`._
 - **Single statement only.** Reject `;`-chained input, and reject anything that isn't `SELECT`/`WITH`/`EXPLAIN`.
 - **Audit:** log every tool call (the SQL + the caller) to CloudWatch. With the Data API, CloudTrail can record `ExecuteStatement` calls ⚠️.
 - **AWS Labs Aurora/Postgres MCP server** (open source) supports a **read-only mode** and Data API connections ⚠️, the same ideas as this lab.
+
+### 4b. Code-review findings in this lab's handler (design-review material)
+
+| Finding | Risk | Better |
+|---|---|---|
+| **Argument name taken from the schema's first property** (L73, L95) | Reordering or adding properties silently changes which argument is read. That's this challenge's bug | Hard-code `arguments["sql"]` in the handler, and validate `arguments` against `inputSchema` |
+| **`describe_table` builds SQL with an f-string** (L84): `WHERE table_name = '{table_name}'` | SQL injection: `table_name = "x' OR '1'='1"` or worse. An LLM can be prompted into sending that | The Data API's **`parameters=[{"name": "t", "value": {"stringValue": table_name}}]`** with `WHERE table_name = :t` |
+| **`query` runs any SQL** as whatever user `SECRET_ARN` holds | With admin creds: DDL/DML from an AI IDE | A read-only user (the fix), `default_transaction_read_only`, `statement_timeout`, allow only `SELECT`/`WITH` |
+| **`explain_query` concatenates `EXPLAIN {sql}`** | Multi-statement strings, and `EXPLAIN ANALYZE DELETE …` *would execute* the DELETE | Reject `;` and `ANALYZE`, run it in a read-only transaction |
+| No schema filter in `describe_table` | Same-named tables in other schemas return mixed columns | Add `AND table_schema = 'public'` |
 
 ### 5. Lambda MCP server pattern recap (C and G)
 
@@ -348,8 +420,9 @@ _Fill in as I go. Screenshots go in `assets/challenge_G/`._
 |---|---|---|
 | 1 | D's `summaryPacific` test | _row returned?_ |
 | 2 | MCP env vars before → after | `SECRET_ARN`: _?_ → agent secret ARN · other vars: _?_ |
-| 3 | Handler argument names | query → _?_ · explain_query → _?_ |
-| 3 | `query` schema before | _?_ |
+| 3 | Handler argument names | `query` and `explain_query` both read the **first schema property** (L73, L95). `describe_table` → `table_name`. `list_tables` → none. The handler uses env vars `AURORA_CLUSTER_ARN`, `DB_NAME`, `SECRET_ARN` (L22–24) |
+| 3 | `query` schema before | Property **`query_text`** (original L8), so the `{"sql": …}` payload fails with *Missing 'query_text' parameter*. Fix: `sql` |
+| 3 | Catalog before | 3 tools (`query`, `describe_table`, `list_tables`). `explain_query` missing |
 | 4 | Fixed `query`, added `explain_query`, Deploy | _status_ |
 | 5 | `tools/list` | _4 tools?_ |
 | 5 | `query` / `explain_query` / `describe_table` | _row / plan (Seq Scan or Index?) / columns_ |

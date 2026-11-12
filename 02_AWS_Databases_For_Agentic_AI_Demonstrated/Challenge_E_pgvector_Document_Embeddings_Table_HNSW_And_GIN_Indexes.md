@@ -1,6 +1,6 @@
 # 🅴 Challenge E: Configure pgvector for document retrieval
 
-> **Status:** 🟡 In progress · **Diagram label:** E (Amazon Aurora pgvector, the *Store vectors* target of Bedrock Knowledge Bases)
+> **Status:** ✅ Passed, *Meets Requirements* (exam lab, 12 Nov 2026) · **Diagram label:** E (Amazon Aurora pgvector, the *Store vectors* target of Bedrock Knowledge Bases)
 > **Services:** Aurora PostgreSQL + **pgvector** (`vector(1024)`, HNSW `vector_cosine_ops`), PostgreSQL full-text search (GIN on `to_tsvector`), the Amazon Bedrock Knowledge Bases Aurora vector-store schema, Amazon Titan Text Embeddings V2, RDS Query Editor
 > **Lab:** [AWS Databases for Agentic AI Demonstrated](README.md) · **Vault:** [index](../README.md)
 
@@ -8,7 +8,7 @@
 
 ## ✅ Status checklist (success criteria)
 
-- [ ] Table **`document_embeddings`** exists with columns:
+- [x] Table **`document_embeddings`** exists with columns:
 
   | Column | Type | Notes |
   |---|---|---|
@@ -18,8 +18,8 @@
   | `metadata` | `jsonb` | |
   | `created_at` | `timestamptz` | |
 
-- [ ] An **HNSW** index on `embedding`, configured for **cosine** similarity (`vector_cosine_ops`)
-- [ ] A **GIN** index on `content`, configured for **full-text** search (`to_tsvector('english', content)`)
+- [x] An **HNSW** index on `embedding`, configured for **cosine** similarity (`vector_cosine_ops`)
+- [x] A **GIN** index on `content`, configured for **full-text** search (`to_tsvector('english', content)`)
 - [ ] *(Optional)* `SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'document_embeddings';` returns both indexes
 
 ---

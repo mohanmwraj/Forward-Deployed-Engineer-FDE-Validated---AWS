@@ -1,6 +1,6 @@
 # 🅰️ Challenge A: Optimize the agent's product search queries
 
-> **Status:** 🟡 In progress · **Diagram label:** A (Amazon Aurora pgvector, on the *Query data* arrow)
+> **Status:** ✅ Passed, *Meets Requirements* (exam lab, 12 Nov 2026) · **Diagram label:** A (Amazon Aurora pgvector, on the *Query data* arrow)
 > **Services:** Aurora PostgreSQL, the **pgvector** extension (HNSW/IVFFlat vector index, distance operators), PostgreSQL B-tree composite index, the planner (`EXPLAIN`), RDS Query Editor (Data API)
 > **Lab:** [AWS Databases for Agentic AI Demonstrated](README.md) · **Vault:** [index](../README.md)
 
@@ -8,8 +8,8 @@
 
 ## ✅ Status checklist (success criteria)
 
-- [ ] The `search_products` function uses the **vector distance operator that matches the embedding index's operator class**
-- [ ] A **composite index** on `product_similarity` supports the query's filter on **category and price**
+- [x] The `search_products` function uses the **vector distance operator that matches the embedding index's operator class**
+- [x] A **composite index** on `product_similarity` supports the query's filter on **category and price**
 - [ ] *(Optional self-check)* `EXPLAIN` on the two diagnostic queries shows the **vector index** used for ordering and the **composite index** used for the category/price filter, with **no sequential scan** on `product_similarity`
 
 ---

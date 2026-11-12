@@ -1,0 +1,42 @@
+[
+  {
+    "name": "query",
+    "description": "Execute a SQL query against the Aurora PostgreSQL database",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query_text": {
+          "type": "string",
+          "description": "The SQL query to execute"
+        }
+      },
+      "required": [
+        "query_text"
+      ]
+    }
+  },
+  {
+    "name": "describe_table",
+    "description": "Get column details for a specific table",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "table_name": {
+          "type": "string",
+          "description": "Name of the table to describe"
+        }
+      },
+      "required": [
+        "table_name"
+      ]
+    }
+  },
+  {
+    "name": "list_tables",
+    "description": "List all tables in the public schema",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  }
+]

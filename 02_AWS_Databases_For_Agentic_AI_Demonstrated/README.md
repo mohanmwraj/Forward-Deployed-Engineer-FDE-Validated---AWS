@@ -3,23 +3,40 @@
 > **Lab:** "AWS Databases for Agentic AI Demonstrated", one of the challenge sets for the AWS Partner FDE credential.
 > **Theme:** build and troubleshoot the data layer behind an AI agent: Aurora PostgreSQL + pgvector and DynamoDB for agent access and memory, Bedrock Knowledge Bases for document retrieval, MCP servers for debugging agent ↔ database calls, and query tuning.
 > **App:** *AnyCompany Insights* chat app (resource prefix `insightflow-`) · **Region:** `us-east-1` only · **Lab resources:** see *🔑 Lab resources* below
-> **Started:** 12 Nov 2026 · **Status legend:** ✅ passed · 🟡 in progress · ⬜ not started · ⚠️ needs improvement
+> **Started:** 12 Nov 2026 · **Passed:** 12 Nov 2026 (7/7 Meets Requirements) · **Status legend:** ✅ passed · 🟡 in progress · ⬜ not started · ⚠️ needs improvement
 > **Back to:** [Vault index](../README.md)
 
 ---
 
-## 🏆 Result: _pending_
+## 🏆 Result: PASSED (7 of 7 Meets Requirements)
 
 | | |
 |---|---|
 | **Microcredential** | AWS Databases for Agentic AI Demonstrated |
-| **Result** | 🟡 In progress |
-| **Pass date** | _—_ |
-| **Valid until** | _—_ (Lab 01 was valid for one year from the pass date) |
-| **Renew / retake from** | _—_ |
+| **Result** | ✅ **PASSED**, all required objectives met |
+| **Pass date** | 12 Nov 2026, 11:49 AM |
+| **Valid until** | 12 Nov 2027, 05:30 AM (valid for one year) |
+| **Renew / retake from** | 9 Aug 2027, 11:49 AM (9 months after passing) |
 | **Badge** | Claim it from the **Credly** email, then add it to the **AWS Skills Profile** |
 
-_Add the result screenshot as `assets/00_exam_result.png` when I have it._
+![Exam lab result: passed, with performance report](assets/00_exam_result_passed.png)
+
+**Performance report** (every row *Meets Requirements*):
+
+| Task statement (report order) | Challenge | Result |
+|---|---|---|
+| Configure Amazon Aurora PostgreSQL for agent access | [D](Challenge_D_Aurora_Query_Tool_Least_Privilege_Secret_SSL_And_Summary_View.md) | ✅ Meets Requirements |
+| Configure pgvector for document retrieval | [E](Challenge_E_pgvector_Document_Embeddings_Table_HNSW_And_GIN_Indexes.md) | ✅ Meets Requirements |
+| Configure Amazon DynamoDB for agent memory | [B](Challenge_B_DynamoDB_Agent_Memory_LangGraph_Checkpointer_Table.md) | ✅ Meets Requirements |
+| Implement Amazon Bedrock Knowledge Bases with Aurora | [F](Challenge_F_Bedrock_Knowledge_Base_On_Aurora_S3_Data_Sources_Sync.md) | ✅ Meets Requirements |
+| Configure the Aurora MCP server for agent debugging | [G](Challenge_G_Aurora_MCP_Server_Agent_Credentials_And_Explain_Query_Tool.md) | ✅ Meets Requirements |
+| Configure the DynamoDB MCP server for state inspection | [C](Challenge_C_DynamoDB_MCP_Server_Region_Tables_Tool_Definitions.md) | ✅ Meets Requirements |
+| Optimize the agent's product search queries | [A](Challenge_A_Product_Search_pgvector_Operator_Class_And_Composite_Index.md) | ✅ Meets Requirements |
+
+**Before renewing (from 9 Aug 2027):**
+1. Re-read the **🔑 Lab resources** and **🧠 Lessons** sections below.
+2. Do the challenges in dependency order: **B → C** (C's table list needs B's `agent-checkpoints`), **D → G** (G runs as D's agent user), **E → F** (F's Knowledge Base writes into E's table).
+3. Copy fresh ARNs from the panel, because the suffix changes on every launch.
 
 ---
 
@@ -145,15 +162,15 @@ The lettered circles on the diagram mark where each challenge happens. I'll conf
 
 | # | Challenge | Key services | Status | Notes |
 |---|---|---|---|---|
-| A | Optimize the agent's product search queries | Aurora PostgreSQL, pgvector (operator ↔ opclass), B-tree composite index, EXPLAIN | 🟡 In progress | [Challenge_A](Challenge_A_Product_Search_pgvector_Operator_Class_And_Composite_Index.md) |
-| B | Configure Amazon DynamoDB for agent memory | DynamoDB (new table `PK`/`SK` + TTL `ttl`, on-demand), Lambda env vars, LangGraph `DynamoDBSaver` | 🟡 In progress | [Challenge_B](Challenge_B_DynamoDB_Agent_Memory_LangGraph_Checkpointer_Table.md) |
-| C | Configure the DynamoDB MCP server for state inspection | Lambda (env vars, Code tab, Deploy, test events), MCP `tool_definitions.json` (JSON Schema), DynamoDB DescribeTable | 🟡 In progress | [Challenge_C](Challenge_C_DynamoDB_MCP_Server_Region_Tables_Tool_Definitions.md) |
-| D | Configure Amazon Aurora PostgreSQL for agent access | Lambda env vars (cluster ARN, DB_NAME, SSL_MODE), Secrets Manager (read-only secret), PostgreSQL view + GRANT, CloudWatch | 🟡 In progress | [Challenge_D](Challenge_D_Aurora_Query_Tool_Least_Privilege_Secret_SSL_And_Summary_View.md) |
-| E | Configure pgvector for document retrieval | Aurora + pgvector (`document_embeddings`, `vector(1024)`, HNSW `vector_cosine_ops`), PostgreSQL FTS (GIN `to_tsvector`), Bedrock KB schema | 🟡 In progress | [Challenge_E](Challenge_E_pgvector_Document_Embeddings_Table_HNSW_And_GIN_Indexes.md) |
-| F | Implement Amazon Bedrock Knowledge Bases with Aurora | Bedrock KB (vector store = Aurora, field mapping `id/embedding/content/metadata`), S3 data sources `policies/` + `product-catalogs/`, sync, Lambda `KNOWLEDGE_BASE_ID` | 🟡 In progress | [Challenge_F](Challenge_F_Bedrock_Knowledge_Base_On_Aurora_S3_Data_Sources_Sync.md) |
-| G | Configure the Aurora MCP server for agent debugging | Lambda env `SECRET_ARN` (agent creds, not admin), MCP `tool_definitions.json` (`query` → single `sql`, add `explain_query`), Deploy, EXPLAIN | 🟡 In progress | [Challenge_G](Challenge_G_Aurora_MCP_Server_Agent_Credentials_And_Explain_Query_Tool.md) |
+| A | Optimize the agent's product search queries | Aurora PostgreSQL, pgvector (operator ↔ opclass), B-tree composite index, EXPLAIN | ✅ Meets Requirements | [Challenge_A](Challenge_A_Product_Search_pgvector_Operator_Class_And_Composite_Index.md) |
+| B | Configure Amazon DynamoDB for agent memory | DynamoDB (new table `PK`/`SK` + TTL `ttl`, on-demand), Lambda env vars, LangGraph `DynamoDBSaver` | ✅ Meets Requirements | [Challenge_B](Challenge_B_DynamoDB_Agent_Memory_LangGraph_Checkpointer_Table.md) |
+| C | Configure the DynamoDB MCP server for state inspection | Lambda (env vars, Code tab, Deploy, test events), MCP `tool_definitions.json` (JSON Schema), DynamoDB DescribeTable | ✅ Meets Requirements | [Challenge_C](Challenge_C_DynamoDB_MCP_Server_Region_Tables_Tool_Definitions.md) |
+| D | Configure Amazon Aurora PostgreSQL for agent access | Lambda env vars (cluster ARN, DB_NAME, SSL_MODE), Secrets Manager (read-only secret), PostgreSQL view + GRANT, CloudWatch | ✅ Meets Requirements | [Challenge_D](Challenge_D_Aurora_Query_Tool_Least_Privilege_Secret_SSL_And_Summary_View.md) |
+| E | Configure pgvector for document retrieval | Aurora + pgvector (`document_embeddings`, `vector(1024)`, HNSW `vector_cosine_ops`), PostgreSQL FTS (GIN `to_tsvector`), Bedrock KB schema | ✅ Meets Requirements | [Challenge_E](Challenge_E_pgvector_Document_Embeddings_Table_HNSW_And_GIN_Indexes.md) |
+| F | Implement Amazon Bedrock Knowledge Bases with Aurora | Bedrock KB (vector store = Aurora, field mapping `id/embedding/content/metadata`), S3 data sources `policies/` + `product-catalogs/`, sync, Lambda `KNOWLEDGE_BASE_ID` | ✅ Meets Requirements | [Challenge_F](Challenge_F_Bedrock_Knowledge_Base_On_Aurora_S3_Data_Sources_Sync.md) |
+| G | Configure the Aurora MCP server for agent debugging | Lambda env `SECRET_ARN` (agent creds, not admin), MCP `tool_definitions.json` (`query` → single `sql`, add `explain_query`), Deploy, EXPLAIN | ✅ Meets Requirements | [Challenge_G](Challenge_G_Aurora_MCP_Server_Agent_Credentials_And_Explain_Query_Tool.md) |
 
-_Rows A–G are placeholders keyed to the diagram labels. I'll rename each one when I see its task card._
+_Labels A–G match the circles on the HLD. Every row was confirmed from its task card._
 
 Each challenge file uses the same layout as Lab 01: status checklist → task card → where it sits in the architecture → root cause → solution → mistakes & lessons → troubleshooting table → study notes (with self-test) → run log.
 
@@ -174,6 +191,7 @@ Each challenge file uses the same layout as Lab 01: status checklist → task ca
 ├── Challenge_<X>_<Short_Title>.md ............ one file per challenge, added as I post them
 └── assets/
     ├── 00_architecture_hld.png ............... shared architecture diagram
+    ├── 00_exam_result_passed.png ............. exam result + performance report
     ├── challenge_A/ .......................... screenshots for Challenge A
     ├── challenge_B/ .......................... screenshots for Challenge B
     ├── challenge_C/ .......................... screenshots + code for Challenge C

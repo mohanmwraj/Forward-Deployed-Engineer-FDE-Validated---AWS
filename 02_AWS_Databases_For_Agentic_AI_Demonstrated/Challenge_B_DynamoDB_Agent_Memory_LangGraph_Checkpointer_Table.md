@@ -1,6 +1,6 @@
 # 🅱️ Challenge B: Configure Amazon DynamoDB for agent memory
 
-> **Status:** 🟡 In progress · **Diagram label:** B (Amazon DynamoDB, on the *Save state* arrow from the LangGraph agent)
+> **Status:** ✅ Passed, *Meets Requirements* (exam lab, 12 Nov 2026) · **Diagram label:** B (Amazon DynamoDB, on the *Save state* arrow from the LangGraph agent)
 > **Services:** Amazon DynamoDB (key schema, TTL, on-demand capacity), AWS Lambda (environment variables, Code tab), LangGraph checkpointer `DynamoDBSaver` from `langgraph-checkpoint-aws`, CloudWatch Logs
 > **Lab:** [AWS Databases for Agentic AI Demonstrated](README.md) · **Vault:** [index](../README.md)
 
@@ -8,8 +8,8 @@
 
 ## ✅ Status checklist (success criteria)
 
-- [ ] A DynamoDB table named **`agent-checkpoints`** is **Active**, with the key schema and TTL attribute the agent's checkpointer requires, and **on-demand** billing (`PAY_PER_REQUEST`)
-- [ ] The agent Lambda's **`CHECKPOINT_TABLE_NAME`** references the correct table, and its **Region configuration** points to the Region where the table exists
+- [x] A DynamoDB table named **`agent-checkpoints`** is **Active**, with the key schema and TTL attribute the agent's checkpointer requires, and **on-demand** billing (`PAY_PER_REQUEST`)
+- [x] The agent Lambda's **`CHECKPOINT_TABLE_NAME`** references the correct table, and its **Region configuration** points to the Region where the table exists
 
 ---
 

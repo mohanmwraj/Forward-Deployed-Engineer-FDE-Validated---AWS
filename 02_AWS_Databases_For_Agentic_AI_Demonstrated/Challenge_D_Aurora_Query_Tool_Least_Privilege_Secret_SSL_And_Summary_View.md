@@ -1,6 +1,6 @@
 # 🅳 Challenge D: Configure Amazon Aurora PostgreSQL for agent access
 
-> **Status:** 🟡 In progress · **Diagram label:** D (Lambda function *query customers*, on LangGraph agent → *Query customers* → Lambda → *Query data* → Aurora, plus *Write logs* → CloudWatch)
+> **Status:** ✅ Passed, *Meets Requirements* (exam lab, 12 Nov 2026) · **Diagram label:** D (Lambda function *query customers*, on LangGraph agent → *Query customers* → Lambda → *Query data* → Aurora, plus *Write logs* → CloudWatch)
 > **Services:** AWS Lambda (env vars, test events), AWS Secrets Manager (least-privilege DB credentials), Amazon Aurora PostgreSQL Serverless v2 (cluster ARN, RDS Data API, SSL), PostgreSQL views + `GRANT`, RDS Query Editor, CloudWatch Logs
 > **Lab:** [AWS Databases for Agentic AI Demonstrated](README.md) · **Vault:** [index](../README.md)
 
@@ -8,10 +8,10 @@
 
 ## ✅ Status checklist (success criteria)
 
-- [ ] The Lambda connects with **no connection errors** in CloudWatch, using a **cluster that exists** on the RDS console and **`SSL_MODE = require`**
-- [ ] The Lambda uses the **Secrets Manager secret scoped for read-only agent access**. **No hardcoded password** remains in its env vars
-- [ ] View **`public.customer_summary`** exists, aggregated by region, with columns `region`, `customer_count`, `total_orders`, `avg_orders`, `most_recent_purchase`
-- [ ] Role **`agent_readonly`** has **`SELECT`** on `customer_summary`
+- [x] The Lambda connects with **no connection errors** in CloudWatch, using a **cluster that exists** on the RDS console and **`SSL_MODE = require`**
+- [x] The Lambda uses the **Secrets Manager secret scoped for read-only agent access**. **No hardcoded password** remains in its env vars
+- [x] View **`public.customer_summary`** exists, aggregated by region, with columns `region`, `customer_count`, `total_orders`, `avg_orders`, `most_recent_purchase`
+- [x] Role **`agent_readonly`** has **`SELECT`** on `customer_summary`
 - [ ] *(Optional)* Lambda test `SELECT COUNT(*) FROM customers WHERE region = 'Pacific'` returns a count
 - [ ] *(Optional)* Lambda test `SELECT * FROM customer_summary WHERE region = 'Pacific'` returns one matching row
 
