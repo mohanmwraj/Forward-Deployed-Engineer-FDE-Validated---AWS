@@ -227,7 +227,7 @@ The lettered circles on the diagram mark where each challenge happens. I read **
 
 | # | Challenge | Key services | Status | Notes |
 |---|---|---|---|---|
-| A | _Guardrails content safety_ | Bedrock Guardrails | ⬜ | |
+| A | Configure content safety by using Amazon Bedrock Guardrails | Guardrails (content filters High, word filter + profanity, PII USERNAME mask / PASSWORD block, regex DISC mask), orchestrator runtime `GUARDRAIL_ID` | 🟡 In progress | [Challenge_A](Challenge_A_Bedrock_Guardrails_Content_Safety_Word_PII_Regex_Filters.md) |
 | B | _OAuth 2.0 with Cognito (M2M)_ | Cognito, AgentCore Identity/JWT authorizers | ⬜ | |
 | C | _Gateway tool routing / orchestrator_ | AgentCore Gateway, Lambda targets, OpenAPI schema | ⬜ | |
 | D | _Knowledge base + KB-specialist runtime_ | Bedrock KB, OpenSearch Serverless, AgentCore Runtime | ⬜ | |
