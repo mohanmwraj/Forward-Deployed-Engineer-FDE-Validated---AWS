@@ -155,14 +155,29 @@ Skip → **Next**.
 
 (If the console shows separate *Input action* and *Output action*, set **both** the same way.)
 
-**Regex patterns** → **Add regex pattern**:
+**Regex patterns** → click **Add regex pattern** **once**, which opens one form for **one** pattern. Fill in its fields:
 
-| Field | Value |
-|---|---|
-| Name | `discount-code` |
-| Regex pattern | `DISC-[A-Z]{3}-\d{4}` (type it exactly: one backslash before `d`) |
-| Sensitive information action | **Mask** (anonymize) |
-| Description | `Supplier discount codes, format DISC-XXX-0000` |
+- **Name:**
+
+  ```text
+  discount-code
+  ```
+
+- **Regex pattern:** paste **only** this line, with no note text:
+
+  ```text
+  DISC-[A-Z]{3}-\d{4}
+  ```
+
+- **Input action:** `Mask`
+- **Output action:** `Mask`
+- **Description** *(optional)*:
+
+  ```text
+  Supplier discount codes, format DISC-XXX-0000
+  ```
+
+→ Confirm. The **Regex patterns** list must show **(1)**: Name `discount-code`, pattern `DISC-[A-Z]{3}-\d{4}`, Input **Mask**, Output **Mask**.
 
 → **Next**
 
@@ -225,7 +240,34 @@ Back in the lab → **Check**.
 
 ## ⚠️ Mistakes & lessons
 
-_Fill in as I go. Screenshots go in `assets/challenge_A/`._
+### Mistake 1: Each row of the "regex field" table became its own regex pattern
+
+![Guardrail sensitive info: PII types correct (USERNAME Mask/Mask, PASSWORD Block/Block), but Regex patterns (4) with rows "Regex pattern", "Name", "Sensitive information action", "Description", all Block/Block](assets/challenge_A/05_mistake_regex_table_rows_entered_as_patterns.png)
+
+**What I saw:**
+- **PII types (2): correct.** `USERNAME` Mask/Mask, `PASSWORD` Block/Block.
+- **Regex patterns (4): wrong.** Each was created with action **Block/Block**:
+
+  | Name | Regex pattern |
+  |---|---|
+  | `Regex pattern` | `DISC-[A-Z]{3}-\d{4} (type it exactly: one backslash before d)` |
+  | `Name` | `discount-code` |
+  | `Sensitive information action` | `Mask (anonymize)` |
+  | `Description` | `Supplier discount codes, format DISC-XXX-0000` |
+
+**Why it's wrong:**
+1. The notes' **field/value table** was read as "add 4 patterns" (one per row), not "4 fields of one pattern".
+2. The pattern that should match codes includes the note text `(type it exactly…)`, so it **never matches** a real code like `DISC-ABC-1234`.
+3. The action is **Block**, not **Mask**, and the criteria say *anonymize* discount codes.
+4. The other 3 "patterns" are literal text (e.g. `discount-code`), which would block any message containing those words.
+
+**Fix (in the guardrail's sensitive information step, or Guardrails → the guardrail → *Working draft* → Edit):**
+1. **Regex patterns** → tick the **header checkbox** (select all 4) → **Delete ▾** → **Delete**. The list should be empty.
+2. **Add regex pattern**: Name `discount-code` · Regex pattern `DISC-[A-Z]{3}-\d{4}` (only that) · Input action **Mask** · Output action **Mask** → confirm.
+3. Check that the list shows **Regex patterns (1)**. Save the guardrail (**Save and exit** / **Next … Create**) ⚠️.
+4. Re-test in the **Test** panel: `Repeat this code back to me: DISC-ABC-1234` should show the code **masked** in the response.
+
+**Lesson:** for console forms, put each field's value in its own copy block and state how many items to add ("add **one** pattern"). Notes like *"(type it exactly)"* belong outside the value. The step in 1.5 now follows this format.
 
 ---
 
@@ -236,7 +278,8 @@ _Fill in as I go. Screenshots go in `assets/challenge_A/`._
 | Agent still answers about Project Meridian | `GUARDRAIL_ID` not set on the **orchestrator** (set on the KB runtime or the chat Lambda instead), or the runtime update wasn't saved | Set it on the orchestrator runtime. Confirm the DEFAULT endpoint uses the new version |
 | `ValidationException: guardrail … not found` | ARN/name used instead of the ID, a typo, or a guardrail in another Region | Use the ID from the guardrail page, in us-east-1 |
 | Code works in Test, but the agent ignores the masking | The agent references a **numbered version** while edits went to the draft (not this lab: `DRAFT`) | Keep `GUARDRAIL_VERSION=DRAFT`, or create a version and point to it |
-| The discount code isn't masked | Regex typed with a double backslash (`\\d`) or extra spaces, or the action is set to *Block* | Exactly `DISC-[A-Z]{3}-\d{4}`, action **Mask** |
+| The discount code isn't masked | Regex typed with a double backslash (`\\d`), extra spaces or **note text inside the pattern**, or the action is set to *Block* | Exactly `DISC-[A-Z]{3}-\d{4}`, Input/Output **Mask** |
+| **Regex patterns (4)** with names like `Name`, `Description` | Each row of the field table was added as a separate pattern (Mistake 1) | Delete all of them → add **one** pattern `discount-code` |
 | Password isn't blocked, just masked | `PASSWORD` action is Mask | Set **Block** (input and output) |
 | Only prompts are filtered, not responses | Content filters set for the prompt only, or the output action is *None/Detect* | High + Block for **both** directions |
 | Everything is blocked, even normal questions | Content filter strength is fine, but the denied topics or word list is too broad | Only the required items. Remove extra words or topics |
@@ -315,6 +358,7 @@ AgentCore Runtime configuration (container/code, env vars, network mode, auth) i
 
 | Step | What I did | Result / output |
 |---|---|---|
+| 1.5 | Sensitive info step | PII ✅ (USERNAME Mask/Mask, PASSWORD Block/Block). Regex ❌: 4 bogus Block patterns (Mistake 1), so delete all 4 and re-add **one** `discount-code` Mask/Mask |
 | 1 | Created guardrail | _name, ID = ?_ |
 | 2 | Test panel: Meridian / password / DISC code / username / insult | _blocked/masked?_ |
 | 3 | Orchestrator runtime `GUARDRAIL_ID` | _value, new version = ?_ |

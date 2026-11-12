@@ -180,13 +180,13 @@ The verbatim problem description is in *📄 Lab brief* above. Each phrase in it
 
 ![AWS AgentCore Demonstrated: high-level design](assets/00_architecture_hld.png)
 
-_The diagram was pasted in chat on 13 Nov 2026. Save it as `assets/00_architecture_hld.png` so it shows here. The diagram is titled "AWS AgentCore Demonstrated"._
+_Diagram saved 13 Nov 2026 (titled "AWS AgentCore Demonstrated"). Each label links to its challenge file once that challenge is posted._
 
 The lettered circles on the diagram mark where each challenge happens. I read **six** labels (A–F).
 
 | Label | Component on the diagram | Data flow | Likely challenge (confirm from the task card) |
 |---|---|---|---|
-| **A** | **Amazon Bedrock Guardrails**, on the orchestrator's *PII / content filtering* arrow | Orchestrator runtime → guardrail → (Nova Pro) | **Content safety**: create or configure a guardrail (content filters, PII), version it, and attach it to the orchestrator's model calls |
+| **[A](Challenge_A_Bedrock_Guardrails_Content_Safety_Word_PII_Regex_Filters.md)** | **Amazon Bedrock Guardrails**, on the orchestrator's *PII / content filtering* arrow | Orchestrator runtime → guardrail → (Nova Pro) | ✔️ **Confirmed:** create a guardrail (blocked messages, content filters High, word filter `Project Meridian` + profanity, PII USERNAME mask / PASSWORD block, regex `DISC-[A-Z]{3}-\d{4}` mask) and set the orchestrator runtime's `GUARDRAIL_ID` |
 | **B** | **Amazon Cognito (OAuth2 M2M)**, with dashed *OAuth token* (from the chat Lambda) and *Gateway token* (from the orchestrator) arrows | Chat Lambda gets a token to call the runtime. Orchestrator gets a token to call the Gateway | **OAuth 2.0**: Cognito app client(s) for the **client-credentials** (M2M) flow, resource server/scopes, plus JWT authorizer settings on the runtime and gateway |
 | **C** | **AgentCore Runtime (orchestrator)** inside the **security group** in the **private subnet**, and its *MCP tools* arrow to the **AgentCore Gateway** | Orchestrator → MCP → Gateway → 4 Lambda targets → DynamoDB tables | **Gateway tool routing** (most likely): targets and schemas for `inventory`, `supplier`, `logistics` and `quality` handlers. Possibly also orchestrator runtime config |
 | **D** | **Amazon Bedrock Knowledge Bases**, between the **KB runtime** and **OpenSearch Service** + the **S3 KB docs** bucket | KB specialist runtime → KB `Retrieve` → OpenSearch vector search. Ingest from S3 | **Deploy the KB** (OpenSearch Serverless collection) **and the KB-specialist runtime** (code zip in S3, Nova Lite) |
@@ -254,9 +254,11 @@ Each challenge file uses the same layout as Labs 01/02:
 ```text
 03_AWS_Agentic_AI_Demonstrated/
 ├── README.md ................................. you are here (scope + resources + HLD + tracker)
+├── Challenge_A_Bedrock_Guardrails_Content_Safety_Word_PII_Regex_Filters.md
 ├── Challenge_<X>_<Short_Title>.md ............ one file per challenge, added as I post them
 └── assets/
-    ├── 00_architecture_hld.png ............... shared architecture diagram (when posted)
+    ├── 00_architecture_hld.png ............... shared architecture diagram
+    ├── challenge_A/ .......................... screenshots for Challenge A
     └── challenge_<X>/ ........................ screenshots (+ code/ for handler and schema files)
 ```
 
