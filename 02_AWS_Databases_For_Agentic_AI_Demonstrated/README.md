@@ -47,6 +47,7 @@ _Add the result screenshot as `assets/00_exam_result.png` when I have it._
 - **DynamoDB tables:** `agent-state` (original, wrong key schema, so leave it) and **`agent-checkpoints`** (created in B: `PK`/`SK` String, TTL `ttl`, on-demand) *(Challenge B)*
 - **Agent Lambda env vars:** `CHECKPOINT_TABLE_NAME`, `AWS_REGION_OVERRIDE`, `KEY_SCHEMA` (a decoy) *(Challenge B)*
 - **DynamoDB MCP server:** env vars `AWS_REGION_OVERRIDE`, `TABLE_NAMES` (allow-list: `user-sessions`, `agent-checkpoints`). Tool catalog in the bundled `tool_definitions.json` (`describe_table`, `sample_items`, `analyze_access_patterns`, …). Table `user-sessions` is pre-built *(Challenge C)*
+- **Aurora query tool Lambda:** env vars `AURORA_CLUSTER_ARN`, `DB_NAME`, `SSL_MODE`, `DB_PASSWORD` (plaintext, remove it), `DB_PASSWORD_SECRET_ARN`. **Three secrets** with prefix `insightflow/aurora-`: `admin-creds` (DDL), **`agent-creds` (read-only, for the agent tools)** and `kb-creds` (Bedrock KB writer, never retrieved as of D, a clue for F). DB role **`agent_readonly`**. Table `customers` (`region`, `total_orders` = spend, `order_count`, `last_purchase`). View `customer_summary` *(Challenge D)*
 
 **Not in the panel. Find these in the console when a challenge needs them:**
 - the DynamoDB table name(s)
@@ -106,7 +107,7 @@ The lettered circles on the diagram mark where each challenge happens. I'll conf
 | **A** | **Amazon Aurora (pgvector)**, where the *Query data* arrow comes in | Query-customers Lambda → SQL → Aurora; Knowledge Bases also stores its vectors here | Aurora/pgvector setup or query performance (indexes, `EXPLAIN`) |
 | **B** | **Amazon DynamoDB**, on the *Save state* arrow | LangGraph agent Lambda → `DynamoDBSaver` checkpoints → DynamoDB | ✔️ **Confirmed:** new `agent-checkpoints` table (`PK`/`SK` String, TTL `ttl`, on-demand) + the agent Lambda's env vars |
 | **C** | **AWS Lambda (DynamoDB MCP Server)** | Developers/DBAs → *Invoke tools* → MCP server → *Inspect tables* → DynamoDB | ✔️ **Confirmed:** Region + `TABLE_NAMES` env vars, `max_results` type and missing `analyze_access_patterns` in `tool_definitions.json` |
-| **D** | **Lambda function (query customers)** | LangGraph agent → *Query customers* → this Lambda → *Query data* → Aurora; *Write logs* → CloudWatch | The agent's database tool: SQL, connection or credentials, logging |
+| **D** | **Lambda function (query customers)** | LangGraph agent → *Query customers* → this Lambda → *Query data* → Aurora; *Write logs* → CloudWatch | ✔️ **Confirmed:** fix the tool Lambda env vars (cluster ARN, `DB_NAME`, `SSL_MODE=require`, read-only secret, remove `DB_PASSWORD`) + `customer_summary` view + `GRANT SELECT` to `agent_readonly` |
 | **E** | **Aurora ← AWS Secrets Manager**, on the *Get credentials* arrow | Secrets Manager → credentials → Aurora access | DB credentials: secret contents, rotation, who can read the secret |
 | **F** | **S3 bucket → Amazon Bedrock Knowledge Bases**, on the *Ingest docs* arrow | Docs in S3 → ingest (sync) → chunk + embed → store vectors in Aurora | KB data source, sync/ingestion, the pgvector table KB writes to |
 | **G** | **Lambda function (Aurora MCP Server)** | Developers/DBAs → *Invoke tools* → MCP server → *Query data* → Aurora | MCP server config so DBAs can debug the agent's SQL |
@@ -144,7 +145,7 @@ The lettered circles on the diagram mark where each challenge happens. I'll conf
 | A | Optimize the agent's product search queries | Aurora PostgreSQL, pgvector (operator ↔ opclass), B-tree composite index, EXPLAIN | 🟡 In progress | [Challenge_A](Challenge_A_Product_Search_pgvector_Operator_Class_And_Composite_Index.md) |
 | B | Configure Amazon DynamoDB for agent memory | DynamoDB (new table `PK`/`SK` + TTL `ttl`, on-demand), Lambda env vars, LangGraph `DynamoDBSaver` | 🟡 In progress | [Challenge_B](Challenge_B_DynamoDB_Agent_Memory_LangGraph_Checkpointer_Table.md) |
 | C | Configure the DynamoDB MCP server for state inspection | Lambda (env vars, Code tab, Deploy, test events), MCP `tool_definitions.json` (JSON Schema), DynamoDB DescribeTable | 🟡 In progress | [Challenge_C](Challenge_C_DynamoDB_MCP_Server_Region_Tables_Tool_Definitions.md) |
-| D | _Query-customers tool Lambda_ | Lambda, Aurora, CloudWatch | ⬜ | |
+| D | Configure Amazon Aurora PostgreSQL for agent access | Lambda env vars (cluster ARN, DB_NAME, SSL_MODE), Secrets Manager (read-only secret), PostgreSQL view + GRANT, CloudWatch | 🟡 In progress | [Challenge_D](Challenge_D_Aurora_Query_Tool_Least_Privilege_Secret_SSL_And_Summary_View.md) |
 | E | _Aurora credentials_ | Secrets Manager, Aurora | ⬜ | |
 | F | _Knowledge Base ingestion_ | S3, Bedrock Knowledge Bases, Aurora pgvector | ⬜ | |
 | G | _Aurora MCP server_ | Lambda, MCP, Aurora | ⬜ | |
@@ -163,12 +164,14 @@ Each challenge file uses the same layout as Lab 01: status checklist → task ca
 ├── Challenge_A_Product_Search_pgvector_Operator_Class_And_Composite_Index.md
 ├── Challenge_B_DynamoDB_Agent_Memory_LangGraph_Checkpointer_Table.md
 ├── Challenge_C_DynamoDB_MCP_Server_Region_Tables_Tool_Definitions.md
+├── Challenge_D_Aurora_Query_Tool_Least_Privilege_Secret_SSL_And_Summary_View.md
 ├── Challenge_<X>_<Short_Title>.md ............ one file per challenge, added as I post them
 └── assets/
     ├── 00_architecture_hld.png ............... shared architecture diagram
     ├── challenge_A/ .......................... screenshots for Challenge A
     ├── challenge_B/ .......................... screenshots for Challenge B
-    ├── challenge_C/ .......................... screenshots for Challenge C
+    ├── challenge_C/ .......................... screenshots + code for Challenge C
+    ├── challenge_D/ .......................... screenshots for Challenge D
     └── challenge_<X>/ ........................ screenshots for each challenge
 ```
 
@@ -189,3 +192,5 @@ Each challenge file uses the same layout as Lab 01: status checklist → task ca
 - **Check who you're connected as before any DDL.** In PostgreSQL, `CREATE INDEX`, `CREATE OR REPLACE FUNCTION` and `ANALYZE` need **ownership**, not `GRANT`s. The panel's `AuroraAgentSecretARN` is the low-privilege **agent** user. DDL needs the **admin** secret (`insightflow/aurora-admin-creds`), whose ARN you copy from Secrets Manager. Run `SELECT current_user;` first. *(A)*
 - **Read the index's operator class. Don't infer it from sample queries.** The index was `vector_cosine_ops` (needs `<=>`), while the function and the task's diagnostic queries used `<->`. Find it with `pg_indexes` / `pg_opclass` first, then make the operator match. *(A)*
 - **The Query editor's "success" can hide a skip.** A non-owner's `ANALYZE` returns *success / no rows changed* without doing anything. *(A)*
+- **"Log group does not exist" means the function has never run**, not that logging is broken. Fix the config before the first test, so the log group (which graders read) holds no early errors. *(D)*
+- **Check for env vars that are *missing*, not just wrong.** Challenge D had no `DB_PASSWORD_SECRET_ARN` at all: you have to *add* it, then *remove* `DB_PASSWORD`. *(D)*
