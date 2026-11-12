@@ -93,7 +93,17 @@ There are **two independent causes**, and each diagnostic query shows one of the
 | **1** | **Operator / operator class mismatch** (diagnostic query 1) | A pgvector index is built for **one** distance function, set by its **operator class** (`vector_l2_ops`, `vector_cosine_ops`, `vector_ip_ops`, …). PostgreSQL can only use the index for `ORDER BY embedding <op> $q LIMIT n` when `<op>` belongs to that operator class. The function orders with a different operator, so the index isn't eligible, and Postgres computes the distance to **every row** and sorts. |
 | **2** | **No index for the relational filter** (diagnostic query 2) | `WHERE category = 'electronics' AND price <= 500` has no B-tree index to satisfy it, so the predicate is checked row by row on a sequential scan. |
 
-**My best guess before checking:** the diagnostic queries use `<->` (L2), and the task expects query 1 to show the vector index once everything is fixed. Fixing the function can't change the plan for those queries. So the embedding index is most likely `vector_l2_ops`, and the function orders with a *different* operator (probably `<=>`, cosine). **Check this in Step 1 before editing.** The rule is always: *match the function's operator to the index's opclass.*
+### ✔️ Confirmed in the lab (Steps 1 and 3)
+
+| What | Found | Meaning |
+|---|---|---|
+| Vector index (Step 1) | **`idx_product_similarity_hnsw`**, method **`hnsw`**, opclass **`vector_cosine_ops`** | The index can only serve ordering by **`<=>`** (cosine distance) |
+| Other indexes (Step 1) | `product_similarity_pkey`, `btree`, `int4_ops` (primary key only) | **No index on `category`/`price`**, which is root cause 2 |
+| Function's `ORDER BY` (Step 3) | `ORDER BY p.embedding <-> query_embedding` | Uses **`<->`** (L2), which doesn't match `vector_cosine_ops`. That's root cause 1 |
+
+**Fix:** change `<->` to `<=>` in the function, and add a `(category, price)` B-tree.
+
+> My guess before checking was the reverse (an L2 index and a cosine function). The lab's diagnostic queries use `<->` because they're meant to **show the sequential scan**, not because `<->` is correct. Lesson: **read the opclass, don't guess it from the sample queries.**
 
 ### Operator ↔ operator class (memorise this)
 
@@ -178,7 +188,25 @@ The Solution Resources panel only has the **agent** secret's ARN (`AuroraAgentSe
    SELECT extversion FROM pg_extension WHERE extname = 'vector';     -- pgvector version (0.8.x = iterative scans available)
    ```
 
-> **How I run SQL in the Query editor:** clear the editor (Ctrl+A, Delete), paste **one** statement, click **Run** and read **Output**, then repeat. One statement per run keeps each result readable and avoids the editor splitting a function body on its internal `;`. If the session drops, reconnect with the same four values from 0.4.
+> **How the Query editor runs SQL (from my screenshot):** it accepts several statements. **Highlight** the lines you want and click **Run**, and only the highlighted statements run. **Output → Statements (n)** then lists each statement with its **Status** (*success*/*error*) and **Response** (the error text or the row count). It's still easiest to highlight **one** statement at a time, so each result is easy to read and a function body is never split on its internal `;`. If the session drops, reconnect with the same four values from 0.4.
+>
+> ⚠️ **Status *success* doesn't always mean the work was done.** For example, `ANALYZE` run by a non-owner *skips* the table with only a warning, and still shows *success / no rows changed*.
+
+#### 0.5 Confirm you're connected as the table owner (do this before any DDL)
+
+`CREATE INDEX`, `CREATE OR REPLACE FUNCTION` and `ANALYZE` all require you to **own** the object (or be a superuser). Check who you are and who owns what:
+
+```sql
+SELECT current_user,
+       (SELECT tableowner FROM pg_tables WHERE tablename = 'product_similarity') AS table_owner,
+       (SELECT proowner::regrole FROM pg_proc WHERE proname = 'search_products')  AS function_owner;
+```
+
+| Result | Meaning | What to do |
+|---|---|---|
+| `current_user` = `table_owner` = `function_owner` | You're the owner | Continue to Step 1 |
+| `current_user` looks like the **agent** user (name contains *agent*, matching the panel's `aurora-agent-creds`) | You connected with the **agent** secret | Reconnect with the **admin** secret ARN (0.3 → 0.4) |
+| `current_user` is the admin, but the owner is a **different** role | The tables belong to a third role | Check `SELECT pg_has_role(current_user, '<table_owner>', 'MEMBER');`. If it's `true`, highlight `SET ROLE <table_owner>;` and your DDL statement together and run them in one go ⚠️ |
 
 ---
 
@@ -224,8 +252,8 @@ The Solution Resources panel only has the **agent** secret's ARN (`AuroraAgentSe
 1. Paste **diagnostic query 1** from the task card, starting with the word `EXPLAIN`, and click **Run**.
 2. **Output** shows one column, **`QUERY PLAN`**, with one row per plan line. Indentation and `->` show child steps.
 3. Find the line that mentions **`product_similarity p`** (alias `p`). Is it `Seq Scan` or `Index Scan`?
-4. Screenshot it and save it as `assets/challenge_A/03_explain_q1_before.png`.
-5. Do the same with **diagnostic query 2** → `04_explain_q2_before.png`.
+4. Screenshot it and save it as `assets/challenge_A/04_explain_q1_before.png`.
+5. Do the same with **diagnostic query 2** → `05_explain_q2_before.png`.
 
 **A bad plan looks like this** (illustrative; costs and parameter names vary by PostgreSQL version):
 
@@ -275,24 +303,44 @@ Limit
 1. In the scratch copy, **change only the distance operator** to the one from Step 1, everywhere it appears (`ORDER BY`, plus any `SELECT … AS distance` the `ORDER BY` alias points to). Keep the name, parameter names, parameter types, `RETURNS`, `LANGUAGE` and everything else **exactly** the same.
 2. Clear the Query editor and paste the **entire** edited statement, from `CREATE OR REPLACE FUNCTION` to the closing `$function$`. Click **Run**.
 3. Expect a success message with no result rows.
-4. **Verify:** re-run the Step 3 query and confirm the new operator is in the definition. Screenshot → `05_function_after.png`.
+4. **Verify:** re-run the Step 3 query and confirm the new operator is in the definition. Screenshot → `06_function_after.png`.
 
-Illustrative shape only. **Use the real text from Step 3**, because the column and parameter names will differ:
+**The actual statement for this lab.** It's built from the Step 3 output, and the **only** change is `<->` → `<=>` in the `ORDER BY`:
 
 ```sql
-CREATE OR REPLACE FUNCTION public.search_products(
-    query_embedding vector, filter_category text, max_price numeric)
-RETURNS TABLE (product_name text, category text, price numeric, distance double precision)
+CREATE OR REPLACE FUNCTION public.search_products(query_embedding vector, target_category text, max_price numeric)
+RETURNS TABLE(product_name text, category text, price numeric)
 LANGUAGE sql STABLE
 AS $function$
-    SELECT p.product_name, p.category, p.price,
-           p.embedding <-> query_embedding AS distance        -- was <=>  (match vector_l2_ops)
-    FROM product_similarity p
-    WHERE p.category = filter_category
-      AND p.price <= max_price
-    ORDER BY p.embedding <-> query_embedding                  -- was <=>  (match vector_l2_ops)
-    LIMIT 5;
+  SELECT p.product_name, p.category, p.price
+  FROM product_similarity p
+  WHERE p.category = target_category AND p.price <= max_price
+  ORDER BY p.embedding <=> query_embedding
+  LIMIT 5;
 $function$;
+```
+
+| | Before (from Step 3) | After |
+|---|---|---|
+| `ORDER BY` | `p.embedding <-> query_embedding` (L2) | `p.embedding <=> query_embedding` (cosine) |
+| Parameters | `query_embedding vector, target_category text, max_price numeric` | unchanged |
+| `RETURNS` | `TABLE(product_name text, category text, price numeric)` | unchanged |
+| `LANGUAGE` / volatility | `sql STABLE` | unchanged |
+
+**Run it as admin** (step 0.5 check first): highlight the whole statement, from `CREATE` to the final `$function$;`, and click **Run**. Status should be **success**.
+
+**Verify** (highlight and run each on its own):
+
+```sql
+-- 1. Returns true once the function uses the cosine operator
+SELECT pg_get_functiondef('search_products(vector,text,numeric)'::regprocedure) LIKE '%<=>%' AS uses_cosine,
+       pg_get_functiondef('search_products(vector,text,numeric)'::regprocedure) LIKE '%<->%' AS still_uses_l2;
+```
+Expected: `uses_cosine = true`, `still_uses_l2 = false`.
+
+```sql
+-- 2. The function still works and returns up to 5 rows
+SELECT * FROM search_products((SELECT embedding FROM product_similarity LIMIT 1), 'electronics', 500);
 ```
 
 - **Don't `DROP` the function.** `CREATE OR REPLACE` keeps its owner and its `GRANT EXECUTE` to the agent's DB user. `DROP` + `CREATE` loses the grant, and the agent then gets *permission denied*.
@@ -323,31 +371,58 @@ $function$;
 
 **Where:** Amazon RDS → Query editor
 
-1. Re-run **diagnostic query 1** → screenshot `06_explain_q1_after.png`.
-2. Re-run **diagnostic query 2** → screenshot `07_explain_q2_after.png`.
-3. Check: **no `Seq Scan … p`** in either plan. The only `Seq Scan` left should be the one-row InitPlan subquery (`product_similarity_1`).
+⚠️ **The task card's diagnostic queries use `<->`, but this lab's index is `vector_cosine_ops`.** Run as written, query 1 will **still** show `Seq Scan … p` after the fix. That's expected, because `<->` can never use a cosine index. For the self-check, run the same two queries with **`<=>`**, the operator the function now uses.
 
-**Expected shapes** (illustrative; use your index names):
+1. Run the **cosine version of query 1** → screenshot `07_explain_q1_after.png`:
+   ```sql
+   EXPLAIN
+   SELECT p.product_name
+   FROM product_similarity p
+   ORDER BY p.embedding <=> (SELECT embedding FROM product_similarity LIMIT 1)
+   LIMIT 5;
+   ```
+2. Run the **cosine version of query 2** → screenshot `08_explain_q2_after.png`:
+   ```sql
+   EXPLAIN
+   SELECT p.product_name, p.category, p.price
+   FROM product_similarity p
+   WHERE p.category = 'electronics' AND p.price <= 500
+   ORDER BY p.embedding <=> (SELECT embedding FROM product_similarity LIMIT 1)
+   LIMIT 5;
+   ```
+3. Check: **no `Seq Scan … p`** in either plan. The only `Seq Scan` left should be the one-row InitPlan subquery (`product_similarity_1`).
+4. *(Optional)* Look at the plan of the function itself. A simple `LANGUAGE sql STABLE` set-returning function can be **inlined**, so `EXPLAIN` may show the inner plan instead of just `Function Scan` ⚠️:
+   ```sql
+   EXPLAIN SELECT * FROM search_products((SELECT embedding FROM product_similarity LIMIT 1), 'electronics', 500);
+   ```
+
+**Expected shapes** (illustrative; costs and `$0` naming vary by version):
 
 ```text
-Query 1 (pure similarity)
+Query 1 (pure similarity, <=>)
 Limit
   InitPlan 1 (returns $0)
     ->  Limit
-          ->  Seq Scan on product_similarity product_similarity_1           ← fine (1 row)
-  ->  Index Scan using <embedding_index> on product_similarity p             ← vector index
-        Order By: (embedding <-> $0)
+          ->  Seq Scan on product_similarity product_similarity_1                 ← fine (1 row)
+  ->  Index Scan using idx_product_similarity_hnsw on product_similarity p         ← vector index
+        Order By: (embedding <=> $0)
 
-Query 2 (filtered)
+Query 2 (filtered, <=>): either of these is fine (no Seq Scan on p)
 Limit
   InitPlan 1 (returns $0) ...
   ->  Sort
-        Sort Key: ((p.embedding <-> $0))
+        Sort Key: ((p.embedding <=> $0))
         ->  Bitmap Heap Scan on product_similarity p
               Recheck Cond: ((category = 'electronics') AND (price <= 500))
-              ->  Bitmap Index Scan on idx_product_similarity_category_price  ← composite index
+              ->  Bitmap Index Scan on idx_product_similarity_category_price      ← composite index
                     Index Cond: ((category = 'electronics') AND (price <= 500))
+  -- or --
+  ->  Index Scan using idx_product_similarity_hnsw on product_similarity p
+        Order By: (embedding <=> $0)
+        Filter: ((category = 'electronics') AND (price <= 500))
 ```
+
+Which plan query 2 gets depends on how selective `electronics AND price <= 500` is. The planner compares "filter first, then sort exactly" with "walk the HNSW graph, then filter" (see Study note 4).
 
 ---
 
@@ -380,7 +455,30 @@ Limit
 
 ## ⚠️ Mistakes & lessons
 
-_Fill in as I go. Screenshots go in `assets/challenge_A/03_…png`._
+### Mistake 1: `CREATE INDEX` failed with *must be owner of table product_similarity*
+
+![Query editor: CREATE INDEX error "must be owner of table product_similarity; SQLState: 42501", ANALYZE "success / no rows changed"](assets/challenge_A/03_error_create_index_must_be_owner.png)
+
+**What I saw** (Statements (2) in the Output pane):
+
+| Statement | Status | Response |
+|---|---|---|
+| `CREATE INDEX idx_product_similarity_category_price ON product_similarity (category, price)` | ❌ error | `ERROR: must be owner of table product_similarity; SQLState: 42501` |
+| `ANALYZE product_similarity` | ✅ success | `no rows changed` |
+
+**Why:**
+- In PostgreSQL, **only the owner of a table** (or a superuser) can create an index on it. The **`GRANT`** privileges SELECT/INSERT/UPDATE aren't enough. `42501` is PostgreSQL's *insufficient_privilege* code.
+- The connection was most likely made with the **agent** secret (`AuroraAgentSecretARN` from the Solution Resources panel). The agent's user can read the table but doesn't own it. The task note says to connect with the **admin** secret `insightflow/aurora-admin-creds`, whose ARN is **not** in the panel.
+- The ANALYZE *success* is misleading. As a non-owner it most likely **skipped** the table with a warning, so it has to be re-run as the owner.
+
+**Fix:**
+1. Run the ownership check from **step 0.5** to confirm `current_user` ≠ `table_owner`.
+2. **Secrets Manager** → *Secrets* → `insightflow/aurora-admin-creds` → copy **Secret ARN**.
+3. **RDS Query editor** → reconnect: the same cluster, *Connect with a Secrets Manager ARN* → the **admin** ARN → database `insightflow`. (Use **Change database** at the top of the Query editor, or reopen *Query editor* from the left navigation ⚠️.)
+4. Re-run step 0.5. `current_user` should now match `table_owner`.
+5. Re-run **Step 4** (if `CREATE OR REPLACE FUNCTION` was run as the agent, it failed with *must be owner of function*), then **Step 5** (`CREATE INDEX` + `ANALYZE`).
+
+**Lesson:** before any DDL, check **`current_user` against the object's owner**. In PostgreSQL, DDL rights come from **ownership**, not from `GRANT`s. Least-privilege agent users are *meant* to be unable to change the schema, which is the point of a separate agent secret.
 
 ---
 
@@ -392,7 +490,8 @@ _Fill in as I go. Screenshots go in `assets/challenge_A/03_…png`._
 | Query editor can't connect / *database does not exist* | Wrong secret or database name | Admin secret `insightflow/aurora-admin-creds`, database `insightflow` |
 | Cluster missing from the Query editor dropdown | Wrong Region, cluster not *Available*, or RDS Data API not enabled | Switch to `us-east-1`. Check *RDS › Databases* status and the cluster's *Configuration* tab |
 | *Invalid ARN* / secret not found when connecting | Pasted the secret **name** instead of the full **ARN**, or a truncated ARN | Copy **Secret ARN** with the copy icon in Secrets Manager (step 0.3) |
-| `permission denied` on `CREATE OR REPLACE FUNCTION` / `CREATE INDEX` | Connected with the **agent** secret from the panel | Reconnect with the **admin** secret |
+| `ERROR: must be owner of table product_similarity; SQLState: 42501` on `CREATE INDEX` (or *must be owner of function* on `CREATE OR REPLACE`) | Connected as a non-owner, most likely with the **agent** secret from the panel | Run the step 0.5 check, then reconnect with the **admin** secret ARN. See Mistake 1 |
+| `ANALYZE` shows *success / no rows changed*, but plans don't change | A non-owner's `ANALYZE` skips the table with only a warning | Re-run `ANALYZE product_similarity;` as the owner |
 | `unterminated dollar-quoted string` / syntax error at end of input | Only part of the function was pasted, or other statements were in the editor too | Clear the editor and paste the whole statement, from `CREATE OR REPLACE` to `$function$;`, on its own |
 | `function search_products(vector, text, numeric) does not exist` | The signature is different | `SELECT oid::regprocedure FROM pg_proc WHERE proname = 'search_products';` and use the exact signature |
 | `cannot change name of input parameter "…"` | Parameter names were changed in `CREATE OR REPLACE` | Keep the original names exactly (copy from `pg_get_functiondef`) |
@@ -515,10 +614,12 @@ All of these must be true:
 | Step | What I ran | Result / output |
 |---|---|---|
 | 0 | `SELECT COUNT(*) FROM product_similarity;` | _row count_ |
-| 1 | `pg_indexes` for `product_similarity` | _embedding index name + opclass_ |
+| 1 | Index + opclass query for `product_similarity` | `product_similarity_pkey` · btree · `int4_ops`. **`idx_product_similarity_hnsw` · hnsw · `vector_cosine_ops`** → the function must use `<=>`. No index on category/price |
 | 2 | Diagnostic query 1 (before) | _scan node on p_ |
 | 2 | Diagnostic query 2 (before) | _scan node on p_ |
-| 3 | `pg_get_functiondef(...)` | _operator found in ORDER BY_ |
-| 4 | `CREATE OR REPLACE FUNCTION` with matching operator | _status_ |
-| 5 | `CREATE INDEX idx_product_similarity_category_price` + `ANALYZE` | _status_ |
+| 3 | `pg_get_functiondef(...)` | `search_products(query_embedding vector, target_category text, max_price numeric) RETURNS TABLE(product_name text, category text, price numeric) LANGUAGE sql STABLE`. Body: `… WHERE p.category = target_category AND p.price <= max_price ORDER BY p.embedding <-> query_embedding LIMIT 5`. **Mismatch: `<->` vs `vector_cosine_ops`** |
+| 4 | `CREATE OR REPLACE FUNCTION` with `<=>` (as admin) | _status_ · `uses_cosine` = ? |
+| 5 | `CREATE INDEX idx_product_similarity_category_price` + `ANALYZE` (attempt 1) | ❌ `ERROR: must be owner of table product_similarity; SQLState: 42501`. ANALYZE "success / no rows changed" (probably skipped). See Mistake 1 |
+| 0.5 | Ownership check (`current_user` vs `table_owner`) | _current_user = ?, table_owner = ?_ |
+| 5 | Re-ran as admin (attempt 2) | _status_ |
 | 6 | Diagnostic queries 1 & 2 (after) | _plans_ |

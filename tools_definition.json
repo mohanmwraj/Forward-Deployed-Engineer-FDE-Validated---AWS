@@ -1,0 +1,46 @@
+[
+  {
+    "name": "describe_table",
+    "description": "Get schema details for a DynamoDB table",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "table_name": {
+          "type": "string",
+          "description": "Name of the table"
+        }
+      },
+      "required": [
+        "table_name"
+      ]
+    }
+  },
+  {
+    "name": "sample_items",
+    "description": "Scan a few items from a DynamoDB table",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "table_name": {
+          "type": "string",
+          "description": "Name of the table"
+        },
+        "max_results": {
+          "type": "string",
+          "description": "Maximum items to return"
+        }
+      },
+      "required": [
+        "table_name"
+      ]
+    }
+  },
+  {
+    "name": "list_tables",
+    "description": "List configured DynamoDB tables",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  }
+]

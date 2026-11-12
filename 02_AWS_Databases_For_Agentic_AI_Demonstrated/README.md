@@ -34,7 +34,7 @@ _Add the result screenshot as `assets/00_exam_result.png` when I have it._
 | `OrchestratorFunctionName` | `insightflow-agent-b55df330` | Lambda (LangGraph agent) |
 | `AuroraToolFunctionName` | `insightflow-aurora-query-tool-b55df330` | Lambda (query customers), **D** |
 | `KBRetrieveToolFunctionName` | `insightflow-kb-retrieve-tool-b55df330` | Lambda (kb-retrieve-tool) |
-| `DynamoDBToolFunctionName` | `insightflow-dynamodb-tool-b55df330` | Not drawn as its own box. Probably the agent's *Save state* path to DynamoDB, **B** |
+| `DynamoDBToolFunctionName` | `insightflow-dynamodb-tool-b55df330` | Not drawn as its own box. **Not** B: B's checkpointer runs inside the agent Lambda. Probably a DynamoDB data tool the agent calls |
 | `DynamoDBMCPFunctionName` | `insightflow-dynamodb-mcp-server-b55df330` | Lambda (DynamoDB MCP Server), **C** |
 | `AuroraMCPFunctionName` | `insightflow-aurora-mcp-server-b55df330` | Lambda (Aurora MCP Server), **G** |
 | `AuroraClusterARN` | `arn:aws:rds:us-east-1:987347315034:cluster:insightflow-cluster-b55df330` | Amazon Aurora (pgvector), **A** |
@@ -44,6 +44,9 @@ _Add the result screenshot as `assets/00_exam_result.png` when I have it._
 **Not in the panel, but given on task cards:**
 - **Database name:** `insightflow` *(Challenge A)*
 - **Admin DB secret:** `insightflow/aurora-admin-creds`, used for DDL in the Query Editor *(Challenge A)*. The panel's `aurora-agent-creds` secret is the agent's own lower-privilege user.
+- **DynamoDB tables:** `agent-state` (original, wrong key schema, so leave it) and **`agent-checkpoints`** (created in B: `PK`/`SK` String, TTL `ttl`, on-demand) *(Challenge B)*
+- **Agent Lambda env vars:** `CHECKPOINT_TABLE_NAME`, `AWS_REGION_OVERRIDE`, `KEY_SCHEMA` (a decoy) *(Challenge B)*
+- **DynamoDB MCP server:** env vars `AWS_REGION_OVERRIDE`, `TABLE_NAMES` (allow-list: `user-sessions`, `agent-checkpoints`). Tool catalog in the bundled `tool_definitions.json` (`describe_table`, `sample_items`, `analyze_access_patterns`, …). Table `user-sessions` is pre-built *(Challenge C)*
 
 **Not in the panel. Find these in the console when a challenge needs them:**
 - the DynamoDB table name(s)
@@ -101,8 +104,8 @@ The lettered circles on the diagram mark where each challenge happens. I'll conf
 | Label | Component on the diagram | Data flow | Likely focus (confirm from the task card) |
 |---|---|---|---|
 | **A** | **Amazon Aurora (pgvector)**, where the *Query data* arrow comes in | Query-customers Lambda → SQL → Aurora; Knowledge Bases also stores its vectors here | Aurora/pgvector setup or query performance (indexes, `EXPLAIN`) |
-| **B** | **Amazon DynamoDB**, on the *Save state* arrow | LangGraph agent Lambda → saves conversation/graph state → DynamoDB | Agent memory: table name/keys in the tool's config, TTL (IAM is preconfigured, so probably not IAM) |
-| **C** | **AWS Lambda (DynamoDB MCP Server)** | Developers/DBAs → *Invoke tools* → MCP server → *Inspect tables* → DynamoDB | MCP server config so DBAs can debug the agent's state |
+| **B** | **Amazon DynamoDB**, on the *Save state* arrow | LangGraph agent Lambda → `DynamoDBSaver` checkpoints → DynamoDB | ✔️ **Confirmed:** new `agent-checkpoints` table (`PK`/`SK` String, TTL `ttl`, on-demand) + the agent Lambda's env vars |
+| **C** | **AWS Lambda (DynamoDB MCP Server)** | Developers/DBAs → *Invoke tools* → MCP server → *Inspect tables* → DynamoDB | ✔️ **Confirmed:** Region + `TABLE_NAMES` env vars, `max_results` type and missing `analyze_access_patterns` in `tool_definitions.json` |
 | **D** | **Lambda function (query customers)** | LangGraph agent → *Query customers* → this Lambda → *Query data* → Aurora; *Write logs* → CloudWatch | The agent's database tool: SQL, connection or credentials, logging |
 | **E** | **Aurora ← AWS Secrets Manager**, on the *Get credentials* arrow | Secrets Manager → credentials → Aurora access | DB credentials: secret contents, rotation, who can read the secret |
 | **F** | **S3 bucket → Amazon Bedrock Knowledge Bases**, on the *Ingest docs* arrow | Docs in S3 → ingest (sync) → chunk + embed → store vectors in Aurora | KB data source, sync/ingestion, the pgvector table KB writes to |
@@ -139,8 +142,8 @@ The lettered circles on the diagram mark where each challenge happens. I'll conf
 | # | Challenge | Key services | Status | Notes |
 |---|---|---|---|---|
 | A | Optimize the agent's product search queries | Aurora PostgreSQL, pgvector (operator ↔ opclass), B-tree composite index, EXPLAIN | 🟡 In progress | [Challenge_A](Challenge_A_Product_Search_pgvector_Operator_Class_And_Composite_Index.md) |
-| B | _Agent state in DynamoDB_ | DynamoDB, Lambda (LangGraph agent) | ⬜ | |
-| C | _DynamoDB MCP server_ | Lambda, MCP, DynamoDB | ⬜ | |
+| B | Configure Amazon DynamoDB for agent memory | DynamoDB (new table `PK`/`SK` + TTL `ttl`, on-demand), Lambda env vars, LangGraph `DynamoDBSaver` | 🟡 In progress | [Challenge_B](Challenge_B_DynamoDB_Agent_Memory_LangGraph_Checkpointer_Table.md) |
+| C | Configure the DynamoDB MCP server for state inspection | Lambda (env vars, Code tab, Deploy, test events), MCP `tool_definitions.json` (JSON Schema), DynamoDB DescribeTable | 🟡 In progress | [Challenge_C](Challenge_C_DynamoDB_MCP_Server_Region_Tables_Tool_Definitions.md) |
 | D | _Query-customers tool Lambda_ | Lambda, Aurora, CloudWatch | ⬜ | |
 | E | _Aurora credentials_ | Secrets Manager, Aurora | ⬜ | |
 | F | _Knowledge Base ingestion_ | S3, Bedrock Knowledge Bases, Aurora pgvector | ⬜ | |
@@ -158,10 +161,14 @@ Each challenge file uses the same layout as Lab 01: status checklist → task ca
 02_AWS_Databases_For_Agentic_AI_Demonstrated/
 ├── README.md ................................. you are here (scope + HLD + tracker)
 ├── Challenge_A_Product_Search_pgvector_Operator_Class_And_Composite_Index.md
+├── Challenge_B_DynamoDB_Agent_Memory_LangGraph_Checkpointer_Table.md
+├── Challenge_C_DynamoDB_MCP_Server_Region_Tables_Tool_Definitions.md
 ├── Challenge_<X>_<Short_Title>.md ............ one file per challenge, added as I post them
 └── assets/
     ├── 00_architecture_hld.png ............... shared architecture diagram
     ├── challenge_A/ .......................... screenshots for Challenge A
+    ├── challenge_B/ .......................... screenshots for Challenge B
+    ├── challenge_C/ .......................... screenshots for Challenge C
     └── challenge_<X>/ ........................ screenshots for each challenge
 ```
 
@@ -179,4 +186,6 @@ Each challenge file uses the same layout as Lab 01: status checklist → task ca
 
 ## 🧠 Lessons from this lab (running list)
 
-_Added as I finish each challenge._
+- **Check who you're connected as before any DDL.** In PostgreSQL, `CREATE INDEX`, `CREATE OR REPLACE FUNCTION` and `ANALYZE` need **ownership**, not `GRANT`s. The panel's `AuroraAgentSecretARN` is the low-privilege **agent** user. DDL needs the **admin** secret (`insightflow/aurora-admin-creds`), whose ARN you copy from Secrets Manager. Run `SELECT current_user;` first. *(A)*
+- **Read the index's operator class. Don't infer it from sample queries.** The index was `vector_cosine_ops` (needs `<=>`), while the function and the task's diagnostic queries used `<->`. Find it with `pg_indexes` / `pg_opclass` first, then make the operator match. *(A)*
+- **The Query editor's "success" can hide a skip.** A non-owner's `ANALYZE` returns *success / no rows changed* without doing anything. *(A)*
