@@ -166,7 +166,7 @@ The verbatim problem description is in *📄 Lab brief* above. Each phrase in it
 | Tool | How | What it tells me |
 |---|---|---|
 | **AgentCore console** | Bedrock AgentCore → **Runtime** / **Gateways** / **Memory** / **Identity** | Status of each resource, its endpoint, auth config, targets, network mode |
-| **Runtime test / playground** | AgentCore → Runtime → agent → **Test** (agent sandbox) ⚠️ | Invoke the runtime directly with a JSON payload |
+| **Runtime test / playground** | AgentCore → **Agents** (= runtimes; no "Runtime" nav item) → agent → **Test**, or the **Playground** nav item ⚠️ | Invoke the runtime directly with a JSON payload |
 | **Gateway targets** | AgentCore → Gateways → gateway → **Targets** | Which Lambda each target routes to, its schema, and the target status |
 | **Guardrail test** | Bedrock → **Guardrails** → guardrail → **Test** | Which policy blocks or masks a prompt or response |
 | **KB test** | Bedrock → **Knowledge Bases** → KB → **Test knowledge base** | Retrieval works after sync |
@@ -187,7 +187,7 @@ The lettered circles on the diagram mark where each challenge happens. I read **
 | Label | Component on the diagram | Data flow | Likely challenge (confirm from the task card) |
 |---|---|---|---|
 | **[A](Challenge_A_Bedrock_Guardrails_Content_Safety_Word_PII_Regex_Filters.md)** | **Amazon Bedrock Guardrails**, on the orchestrator's *PII / content filtering* arrow | Orchestrator runtime → guardrail → (Nova Pro) | ✔️ **Confirmed:** create a guardrail (blocked messages, content filters High, word filter `Project Meridian` + profanity, PII USERNAME mask / PASSWORD block, regex `DISC-[A-Z]{3}-\d{4}` mask) and set the orchestrator runtime's `GUARDRAIL_ID` |
-| **B** | **Amazon Cognito (OAuth2 M2M)**, with dashed *OAuth token* (from the chat Lambda) and *Gateway token* (from the orchestrator) arrows | Chat Lambda gets a token to call the runtime. Orchestrator gets a token to call the Gateway | **OAuth 2.0**: Cognito app client(s) for the **client-credentials** (M2M) flow, resource server/scopes, plus JWT authorizer settings on the runtime and gateway |
+| **[B](Challenge_B_Cognito_OAuth2_M2M_Client_Credentials_JWT_Authorizers.md)** | **Amazon Cognito (OAuth2 M2M)**, with dashed *OAuth token* (from the chat Lambda) and *Gateway token* (from the orchestrator) arrows | Chat Lambda gets a token to call the runtime. Orchestrator gets a token to call the Gateway | **OAuth 2.0**: Cognito app client(s) for the **client-credentials** (M2M) flow, resource server/scopes, plus JWT authorizer settings on the runtime and gateway |
 | **C** | **AgentCore Runtime (orchestrator)** inside the **security group** in the **private subnet**, and its *MCP tools* arrow to the **AgentCore Gateway** | Orchestrator → MCP → Gateway → 4 Lambda targets → DynamoDB tables | **Gateway tool routing** (most likely): targets and schemas for `inventory`, `supplier`, `logistics` and `quality` handlers. Possibly also orchestrator runtime config |
 | **D** | **Amazon Bedrock Knowledge Bases**, between the **KB runtime** and **OpenSearch Service** + the **S3 KB docs** bucket | KB specialist runtime → KB `Retrieve` → OpenSearch vector search. Ingest from S3 | **Deploy the KB** (OpenSearch Serverless collection) **and the KB-specialist runtime** (code zip in S3, Nova Lite) |
 | **E** | **AgentCore Memory**, on the orchestrator → memory arrow | Orchestrator saves and loads conversation events and long-term memories | **Configure Memory**: memory resource + strategies, memory ID wired into the orchestrator |
@@ -228,7 +228,7 @@ The lettered circles on the diagram mark where each challenge happens. I read **
 | # | Challenge | Key services | Status | Notes |
 |---|---|---|---|---|
 | A | Configure content safety by using Amazon Bedrock Guardrails | Guardrails (content filters High, word filter + profanity, PII USERNAME mask / PASSWORD block, regex DISC mask), orchestrator runtime `GUARDRAIL_ID` | 🟡 In progress | [Challenge_A](Challenge_A_Bedrock_Guardrails_Content_Safety_Word_PII_Regex_Filters.md) |
-| B | _OAuth 2.0 with Cognito (M2M)_ | Cognito, AgentCore Identity/JWT authorizers | ⬜ | |
+| B | Configure OAuth 2.0 authentication | Cognito M2M app client (secret, client_credentials, `supplychain/read`+`write`), Gateway + orchestrator runtime JWT `allowedClients`, chat Lambda env (`ORCHESTRATOR_RUNTIME_ARN`, `COGNITO_*`), runtime env `COGNITO_*` | 🟡 In progress | [Challenge_B](Challenge_B_Cognito_OAuth2_M2M_Client_Credentials_JWT_Authorizers.md) |
 | C | _Gateway tool routing / orchestrator_ | AgentCore Gateway, Lambda targets, OpenAPI schema | ⬜ | |
 | D | _Knowledge base + KB-specialist runtime_ | Bedrock KB, OpenSearch Serverless, AgentCore Runtime | ⬜ | |
 | E | _AgentCore Memory_ | AgentCore Memory | ⬜ | |
@@ -255,10 +255,12 @@ Each challenge file uses the same layout as Labs 01/02:
 03_AWS_Agentic_AI_Demonstrated/
 ├── README.md ................................. you are here (scope + resources + HLD + tracker)
 ├── Challenge_A_Bedrock_Guardrails_Content_Safety_Word_PII_Regex_Filters.md
+├── Challenge_B_Cognito_OAuth2_M2M_Client_Credentials_JWT_Authorizers.md
 ├── Challenge_<X>_<Short_Title>.md ............ one file per challenge, added as I post them
 └── assets/
     ├── 00_architecture_hld.png ............... shared architecture diagram
     ├── challenge_A/ .......................... screenshots for Challenge A
+    ├── challenge_B/ .......................... screenshots for Challenge B
     └── challenge_<X>/ ........................ screenshots (+ code/ for handler and schema files)
 ```
 

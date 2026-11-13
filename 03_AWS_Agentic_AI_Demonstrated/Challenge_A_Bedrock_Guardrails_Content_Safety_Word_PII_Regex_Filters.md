@@ -209,9 +209,22 @@ Use **View trace** to see which policy intervened. Screenshot → `03_guardrail_
 
 ### Step 3: Connect it to the orchestrator runtime (Bedrock AgentCore)
 
-**Where:** Console search → **Amazon Bedrock AgentCore** → left navigation → **Runtime** (agent runtimes) → the **orchestrator** runtime
+**Where:** Console search → **Amazon Bedrock AgentCore** → left navigation → **Agents** (top section, under *Overview*) → the **orchestrator** agent
 
-1. Open the orchestrator → **Update hosting** / **Edit** ⚠️ (the runtime's configuration).
+> **Console naming (confirmed in the lab, 13 Nov 2026):** the current AgentCore console has **no "Runtime" item** in the left nav. Agent runtimes are listed under **Agents**. The nav is *Overview · **Agents** · Playground · Observability*, then *Connections* (Browser, Code Interpreter, Web Search, Knowledge Bases, Outbound Auth, Payments) and *Resources* (Memory, Evaluations, **Gateways**, Policy, Capacity providers, Optimizations).
+>
+> ![AgentCore console left nav: Agents is the runtime list](assets/challenge_A/06_agentcore_console_left_nav_agents.png)
+
+0. **Agents** → find the orchestrator. Its name contains *orchestrator* / *supply_chain* plus suffix `8bc8fd20` ⚠️. The KB specialist is a different agent, and it may not exist yet (Challenge D creates it).
+   - If the list is empty, check the region is **us-east-1** (top right).
+   - CLI fallback to get the name:
+
+     ```bash
+     aws bedrock-agentcore-control list-agent-runtimes --region us-east-1 \
+       --query "agentRuntimes[].[agentRuntimeName,agentRuntimeId,agentRuntimeVersion]" --output table
+     ```
+
+1. Open the orchestrator → **Edit** / **Update hosting** / **Update agent** ⚠️ (the button that edits the runtime configuration, top right of the agent page).
 2. Find **Environment variables** (often under *Advanced configurations*).
 3. Set **`GUARDRAIL_ID`** = the guardrail **ID** from Step 1.7.
 4. **Leave `GUARDRAIL_VERSION` = `DRAFT`** and all other variables unchanged.
@@ -232,7 +245,7 @@ Back in the lab → **Check**.
 ```text
 0 Region → 1 Bedrock › Guardrails › Create: blocked msgs (in+out) → content filters HATE/INSULTS/MISCONDUCT/VIOLENCE High (prompt+response)
   → word filters: profanity ✓ + "Project Meridian" → sensitive info: USERNAME Mask, PASSWORD Block, regex DISC-[A-Z]{3}-\d{4} Mask
-  → Create → copy ID → 2 Test panel (Working draft) → 3 AgentCore › Runtime › orchestrator › env GUARDRAIL_ID=<id> → save (new version)
+  → Create → copy ID → 2 Test panel (Working draft) → 3 AgentCore › Agents › orchestrator › Edit › env GUARDRAIL_ID=<id> → save (new version)
   → 4 chat app → 5 Check
 ```
 
@@ -360,6 +373,7 @@ AgentCore Runtime configuration (container/code, env vars, network mode, auth) i
 |---|---|---|
 | 1.5 | Sensitive info step | PII ✅ (USERNAME Mask/Mask, PASSWORD Block/Block). Regex ❌: 4 bogus Block patterns (Mistake 1), so delete all 4 and re-add **one** `discount-code` Mask/Mask |
 | 1 | Created guardrail | _name, ID = ?_ |
+| 3 | Looked for "Runtime" in the AgentCore nav | Not there. The new console lists runtimes under **Agents** (screenshot `06_…`) |
 | 2 | Test panel: Meridian / password / DISC code / username / insult | _blocked/masked?_ |
 | 3 | Orchestrator runtime `GUARDRAIL_ID` | _value, new version = ?_ |
 | 5 | Check | _result_ |
