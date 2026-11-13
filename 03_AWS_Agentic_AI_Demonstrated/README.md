@@ -189,7 +189,7 @@ The lettered circles on the diagram mark where each challenge happens. I read **
 | **[A](Challenge_A_Bedrock_Guardrails_Content_Safety_Word_PII_Regex_Filters.md)** | **Amazon Bedrock Guardrails**, on the orchestrator's *PII / content filtering* arrow | Orchestrator runtime → guardrail → (Nova Pro) | ✔️ **Confirmed:** create a guardrail (blocked messages, content filters High, word filter `Project Meridian` + profanity, PII USERNAME mask / PASSWORD block, regex `DISC-[A-Z]{3}-\d{4}` mask) and set the orchestrator runtime's `GUARDRAIL_ID` |
 | **[B](Challenge_B_Cognito_OAuth2_M2M_Client_Credentials_JWT_Authorizers.md)** | **Amazon Cognito (OAuth2 M2M)**, with dashed *OAuth token* (from the chat Lambda) and *Gateway token* (from the orchestrator) arrows | Chat Lambda gets a token to call the runtime. Orchestrator gets a token to call the Gateway | **OAuth 2.0**: Cognito app client(s) for the **client-credentials** (M2M) flow, resource server/scopes, plus JWT authorizer settings on the runtime and gateway |
 | **[C](Challenge_C_AgentCore_Gateway_Tool_Routing_GATEWAY_URL_Lambda_Targets.md)** | **AgentCore Runtime (orchestrator)** inside the **security group** in the **private subnet**, and its *MCP tools* arrow to the **AgentCore Gateway** | Orchestrator → MCP → Gateway → 4 Lambda targets → DynamoDB tables | **Gateway tool routing** (most likely): targets and schemas for `inventory`, `supplier`, `logistics` and `quality` handlers. Possibly also orchestrator runtime config |
-| **D** | **Amazon Bedrock Knowledge Bases**, between the **KB runtime** and **OpenSearch Service** + the **S3 KB docs** bucket | KB specialist runtime → KB `Retrieve` → OpenSearch vector search. Ingest from S3 | **Deploy the KB** (OpenSearch Serverless collection) **and the KB-specialist runtime** (code zip in S3, Nova Lite) |
+| **[D](Challenge_D_Bedrock_KB_OpenSearch_Serverless_KB_Specialist_Runtime_A2A.md)** | **Amazon Bedrock Knowledge Bases**, between the **KB runtime** and **OpenSearch Service** + the **S3 KB docs** bucket | KB specialist runtime → KB `Retrieve` → OpenSearch vector search. Ingest from S3 | **Deploy the KB** (OpenSearch Serverless collection) **and the KB-specialist runtime** (code zip in S3, Nova Lite) |
 | **E** | **AgentCore Memory**, on the orchestrator → memory arrow | Orchestrator saves and loads conversation events and long-term memories | **Configure Memory**: memory resource + strategies, memory ID wired into the orchestrator |
 | **F** | The **VPC**: **private subnet** (both runtimes, security group, **VPC endpoints**) + **public subnet** (**NAT Gateway**) | Runtimes reach AWS APIs through VPC endpoints, or through the internet via NAT | **VPC networking**: runtime network mode = VPC with the private subnets + SG. Endpoint/NAT reachability |
 
@@ -230,7 +230,7 @@ The lettered circles on the diagram mark where each challenge happens. I read **
 | A | Configure content safety by using Amazon Bedrock Guardrails | Guardrails (content filters High, word filter + profanity, PII USERNAME mask / PASSWORD block, regex DISC mask), orchestrator runtime `GUARDRAIL_ID` | 🟡 In progress | [Challenge_A](Challenge_A_Bedrock_Guardrails_Content_Safety_Word_PII_Regex_Filters.md) |
 | B | Configure OAuth 2.0 authentication | Cognito M2M app client (secret, client_credentials, `supplychain/read`+`write`), Gateway + orchestrator runtime JWT `allowedClients`, chat Lambda env (`ORCHESTRATOR_RUNTIME_ARN`, `COGNITO_*`), runtime env `COGNITO_*` | 🟡 In progress | [Challenge_B](Challenge_B_Cognito_OAuth2_M2M_Client_Credentials_JWT_Authorizers.md) |
 | C | Troubleshoot AgentCore Gateway tool routing | Orchestrator env `GATEWAY_URL` (gateway `…/mcp` URL), `logistics-target` → `logistics-handler-8bc8fd20`, create `quality-target` (quality Lambda + S3 `quality_tools.json` + gateway IAM role) | 🟡 In progress | [Challenge_C](Challenge_C_AgentCore_Gateway_Tool_Routing_GATEWAY_URL_Lambda_Targets.md) |
-| D | _Knowledge base + KB-specialist runtime_ | Bedrock KB, OpenSearch Serverless, AgentCore Runtime | ⬜ | |
+| D | Deploy the knowledge base and KB specialist agent runtime | Bedrock KB (S3 `supply-chain-knowledge-8bc8fd20`, Titan V2, existing AOSS index `bedrock-knowledge-base-index`) + sync, runtime `kb_specialist_runtime` (S3 zip, `main.py`, HTTP, `PYTHON_3_11`, CUSTOM_JWT, env `MODEL_ID`/`KNOWLEDGE_BASE_ID`), DEFAULT endpoint, orchestrator `KB_SPECIALIST_RUNTIME_ARN` | 🟡 In progress | [Challenge_D](Challenge_D_Bedrock_KB_OpenSearch_Serverless_KB_Specialist_Runtime_A2A.md) |
 | E | _AgentCore Memory_ | AgentCore Memory | ⬜ | |
 | F | _VPC networking for runtimes_ | VPC, private subnets, security group, VPC endpoints, NAT | ⬜ | |
 
@@ -257,12 +257,14 @@ Each challenge file uses the same layout as Labs 01/02:
 ├── Challenge_A_Bedrock_Guardrails_Content_Safety_Word_PII_Regex_Filters.md
 ├── Challenge_B_Cognito_OAuth2_M2M_Client_Credentials_JWT_Authorizers.md
 ├── Challenge_C_AgentCore_Gateway_Tool_Routing_GATEWAY_URL_Lambda_Targets.md
+├── Challenge_D_Bedrock_KB_OpenSearch_Serverless_KB_Specialist_Runtime_A2A.md
 ├── Challenge_<X>_<Short_Title>.md ............ one file per challenge, added as I post them
 └── assets/
     ├── 00_architecture_hld.png ............... shared architecture diagram
     ├── challenge_A/ .......................... screenshots for Challenge A
     ├── challenge_B/ .......................... screenshots for Challenge B
     ├── challenge_C/ .......................... screenshots for Challenge C
+    ├── challenge_D/ .......................... screenshots for Challenge D
     └── challenge_<X>/ ........................ screenshots (+ code/ for handler and schema files)
 ```
 
