@@ -118,6 +118,10 @@ Nothing is "broken". The pieces were **never created or wired up**:
 
 **Where:** Console search → **Amazon OpenSearch Service** → left nav *Serverless* → **Collections** → the collection (`mwbw68k7d4isr0o7wfkk`) → **Indexes** tab → **`bedrock-knowledge-base-index`**
 
+> **Seen in the lab (13 Nov 2026):** the collection page opens on **Overview** (Status *Active*, type *Vectorsearch*, **Indexes 1**, Total size 0 B). The field names are **not** on Overview. Click the **Indexes** tab (*Overview · Monitor · Snapshots · **Indexes** · Tags*), then the index name.
+>
+> ![AOSS collection overview: Vectorsearch, Active, 1 index; field names are under the Indexes tab](assets/challenge_D/02_aoss_collection_overview.png)
+
 Note the three fields. The usual Bedrock names are:
 
 | KB field mapping | Typical name in the index | Type |
@@ -126,6 +130,18 @@ Note the three fields. The usual Bedrock names are:
 | **Text field name** | `AMAZON_BEDROCK_TEXT_CHUNK` ⚠️ | text |
 | **Bedrock-managed metadata field name** | `AMAZON_BEDROCK_METADATA` ⚠️ | text (not indexed) |
 
+**✔️ Confirmed for this launch (13 Nov 2026), collection `kb-collection` → index `bedrock-knowledge-base-index`:**
+
+![Index details: vector field bedrock-kb-vector (faiss, FP32, 1024, dot_product); metadata AMAZON_BEDROCK_METADATA, AMAZON_BEDROCK_TEXT_CHUNK, id](assets/challenge_D/03_aoss_index_fields.png)
+
+| KB field mapping | **Value to enter** | From the index |
+|---|---|---|
+| **Vector field name** | **`bedrock-kb-vector`** ⚠️ (the cell was highlighted in the screenshot, so copy it from the console) | faiss · **FP32** · **1024** dims · **dot_product** · M 16 · ef 512 |
+| **Text field name** | **`AMAZON_BEDROCK_TEXT_CHUNK`** | text, filterable |
+| **Bedrock-managed metadata field name** | **`AMAZON_BEDROCK_METADATA`** | text, not filterable |
+
+So it is **not** the default `bedrock-knowledge-base-default-vector`. The `id` field is just the document ID and isn't mapped. **1024 + FP32** means Titan V2 with **1024 dimensions, Floating-point**.
+
 Use **whatever the index actually shows**. A mismatch is the #1 cause of KB creation failures. Also confirm the vector dimension is **1024**, which matches Titan V2's default.
 
 ### Step 1: Create the knowledge base (Amazon Bedrock)
@@ -133,6 +149,13 @@ Use **whatever the index actually shows**. A mismatch is the #1 cause of KB crea
 **Where:** Console search → **Amazon Bedrock** → left nav *Build* → **Knowledge Bases** → **Create** → **Knowledge Base with vector store**
 
 *(The AgentCore nav item **Connections → Knowledge Bases (KB)** leads to the same KBs ⚠️.)*
+
+> **"Structured" vs "Unstructured" data (confirmed in the lab on 13 Nov 2026): choose Unstructured.** The sources are **documents** in S3 (inventory procedures, supplier manual, QC manual), which get chunked, embedded and put in a **vector store**. *Structured* is for **SQL data stores** (e.g. Amazon Redshift, queried by natural language → SQL), with no embeddings or OpenSearch.
+>
+> **"Managed" vs "Self-managed" (the console asks this, confirmed in the lab on 13 Nov 2026): choose Self-managed.**
+> - **Managed:** Bedrock creates and runs a **new** vector store for you, so it would **not** use the lab's OpenSearch Serverless collection or the `bedrock-knowledge-base-index` index.
+> - **Self-managed:** **you bring an existing vector store**. That is what the task requires ("Create an Amazon Bedrock knowledge base with the **existing OpenSearch Serverless vector store**"), and it's the option that shows the collection ARN / index / field-mapping fields below.
+> - The pre-made `KnowledgeBaseRoleArn` is scoped to the existing collection, so a managed store could also fail on permissions.
 
 **1.1 Knowledge base details**
 
@@ -261,7 +284,15 @@ The answer should quote or paraphrase **passages from the documents**, not a gen
 
 ## ⚠️ Mistakes & lessons
 
-_Fill in as I go. Screenshots go in `assets/challenge_D/`._
+### Mistake 1: Opened **Create Harness** instead of the code-deploy (Runtime) flow
+
+![AgentCore Agents → Create Harness page with name kb_specialist_runtime; sections Model and system prompt, Memory, Tools, with no S3 code / entry point / protocol fields](assets/challenge_D/04_mistake_create_harness_page.png)
+
+- **What happened:** Agents → Create led to **Create Harness**: *Harness name*, *Model and system prompt*, *Memory*, *Tools*.
+- **Why it's wrong:** a **harness** is AgentCore's **config-only managed agent**. You pick a model, prompt and tools, and AgentCore runs the loop. It has **no fields** for the S3 code zip, `main.py`, `PYTHON_3_11` or HTTP, and the task says *"deploy … from the S3 code artifact"*.
+- **Fix:** **Cancel without creating**, because a harness name can't be edited later and could take up the name. Go back to **Agents** and choose the **deploy your own code / host agent (Runtime)** option ⚠️. The right form asks for the **agent source (S3 / ECR)**, **runtime**, **entry point**, **protocol**, **IAM role**, **inbound auth** and **environment variables**.
+- **Side info from the same screen:** the banner confirmed the orchestrator is **`orchestrator_runtime_8bc8fd20`**, now at **Version 5**, with the DEFAULT endpoint moving to v5. The *"Update IAM execution role"* banner prompt can be ignored, because the lab pre-sets IAM.
+- **Lesson:** Overview says *"Create a new agent with the **harness**, or **deploy your own code** to the runtime"*. These are two different creation paths.
 
 ---
 
@@ -313,7 +344,9 @@ Logs: **CloudWatch** → `/aws/bedrock-agentcore/runtimes/kb_specialist_runtime-
 
 | Step | What I did | Result / output |
 |---|---|---|
-| 0 | KB role / index field names | _?_ |
+| 0 | KB role / index field names | Collection `kb-collection`, index `bedrock-knowledge-base-index`: vector **`bedrock-kb-vector`** (faiss FP32 1024 dot_product), text `AMAZON_BEDROCK_TEXT_CHUNK`, metadata `AMAZON_BEDROCK_METADATA`. KB role = _?_ |
+| 1 | Console asked **Structured vs Unstructured** | Chose **Unstructured** (S3 documents → vector store) |
+| 1 | Console asked **Managed vs Self-managed** | Chose **Self-managed** (existing AOSS collection + index) |
 | 1 | KB created | _KB ID = ?_ |
 | 2 | Sync | _docs added = ?_ |
 | 3 | Specialist runtime | _ARN = ?, READY?_ |
