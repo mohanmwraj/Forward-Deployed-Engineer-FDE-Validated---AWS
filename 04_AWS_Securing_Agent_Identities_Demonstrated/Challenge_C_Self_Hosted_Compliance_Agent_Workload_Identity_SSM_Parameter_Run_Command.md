@@ -152,16 +152,55 @@ aws ssm get-parameter --name /compliance-agent/workload-identity-arn --query Par
 
 ### Step 3: Run the SSM documents on `compliance-agent-host`
 
-**UI (Systems Manager):**
-1. Top search bar → **Documents** (Systems Manager feature) → **Owned by me** tab → **RestartComplianceAgent** → **Run command**.
-2. **Target selection** → **Choose instances manually** → tick **compliance-agent-host**.
-   - Parameters: leave at their defaults.
-   - *Output options*: untick S3 if it's ticked.
-3. Click **Run** → wait for **Success** (refresh as needed).
-4. Back to **Documents** → **Owned by me** → **InvokeComplianceAgent** → **Run command** → same instance → **Run**.
-5. When it shows **Success**: click the instance ID → **Output** → expand **Step 1 – Output**. It should report that a token was obtained.
+**UI (Systems Manager), click by click.** Do the whole flow for **RestartComplianceAgent** first, then repeat it for **InvokeComplianceAgent**.
 
-Alternative path: Systems Manager → *Node tools* → **Run Command** → **Run command** → search the document name ⚠️.
+**A. Open the document**
+1. Top search bar → type **Documents** → click **Documents** under *Features* (Systems Manager). Or go Systems Manager → left nav *Shared resources* → **Documents**.
+2. Tabs: *Owned by Amazon* · **Owned by me** · *Shared with me* · *All documents*. Click **Owned by me**.
+3. Search box: `Compliance`. Both `RestartComplianceAgent` and `InvokeComplianceAgent` are listed.
+4. Click the **name** `RestartComplianceAgent` (blue link) to open its details page.
+   - Optional: the **Content** tab shows the script.
+5. Top right → **Run command** (orange). The *Run a command* page opens with the document preselected.
+   - Fallback: in the list, select the document's radio button → **Actions ▾** → **Run command**.
+
+**B. Fill in the "Run a command" page (top to bottom)**
+
+| Section | Setting |
+|---|---|
+| Command document | Preselected. Don't change it |
+| Document version | **Default version at runtime** |
+| Command parameters | Defaults (may be none) |
+| **Target selection** | **Choose instances manually** → type `compliance` in the filter → tick **compliance-agent-host**. **Not** `workstation-b4183f00` |
+| Other parameters | Leave them (timeout 600 s) |
+| Rate control | Leave them |
+| **Output options** | **Untick "Enable an S3 bucket"** if ticked, because the lab role may not be able to write there. Leave CloudWatch logs off |
+| SNS notifications | Disabled |
+| AWS command line interface command | Optional: expand it to see the matching `aws ssm send-command` |
+
+→ **Run** (orange, bottom right).
+
+**C. Status and output**
+1. Page: **Command ID: … was successfully sent!**
+   - **Command status**: *In progress* → **Success**.
+   - Click **refresh ↻** every few seconds (it takes 5–30 s).
+2. **Targets and outputs** → the `compliance-agent-host` row should show **Success**.
+3. Click the **Instance ID** link to open the **Output** page.
+   - **Step 1 – Output** is stdout. For Restart, the service restarted or is active.
+   - **Step 1 – Error** is stderr. Paste it if anything fails.
+
+**D. Repeat for InvokeComplianceAgent**
+1. **Documents** → **Owned by me** → **InvokeComplianceAgent** → **Run command**.
+2. **Choose instances manually** → tick **compliance-agent-host** → untick S3 → **Run**.
+3. Refresh until **Success** → **Instance ID** → **Step 1 – Output**. It should report that the **workload access token was obtained**.
+
+| What you see | Meaning / fix |
+|---|---|
+| Host isn't in the manual list | Not an SSM-managed node yet. Clear the filter, wait about 1 min, refresh |
+| **Failed** / **Delivery timed out** | Instance ID → **Step 1 – Error** |
+| Invoke: `ParameterNotFound` | Parameter name mismatch, or Restart ran before the parameter existed. Fix it, then **Restart** → **Invoke** |
+| Invoke: `AccessDenied` / `ResourceNotFound` on `GetWorkloadAccessToken` | The parameter value isn't exactly the `compliance-audit-agent` ARN |
+
+Alternative path: Systems Manager → *Node tools* → **Run Command** → **Run command** → search for the document name ⚠️.
 
 **CLI (CloudShell):**
 ```bash
@@ -244,9 +283,50 @@ _Fill in as I go. Screenshots go in `assets/challenge_C/`._
 
 | Step | What I did | Result / output |
 |---|---|---|
-| 1 | Reference code grep | _parameter read how?_ |
-| 1 | create-workload-identity | _ARN = ?, tags?_ |
+| 1 | Reference code grep | ✅ `SSM_PARAM_NAME = "/compliance-agent/workload-identity-arn"`. `get_parameter(Name=…)` has **no decryption**, so **String** is fine. `workload_name = identity_arn.split("/")[-1]`, so the ARN must **end in the name** (no trailing space or slash). Then `get_workload_access_token(workloadName=…)` |
+| 1 | create-workload-identity `--tags '{"Team":"compliance"}'` | ✅ Accepted. ARN `arn:aws:bedrock-agentcore:us-east-1:987347315034:workload-identity-directory/default/workload-identity/compliance-audit-agent`, `allowedResourceOauth2ReturnUrls: []`. ✅ `get-workload-identity` → same ARN. `list-tags-for-resource` → `{"Team": "compliance"}` (the only tag, since this identity wasn't created by CloudFormation) |
 | 2 | Parameter created | _value = ?_ |
 | 3a | RestartComplianceAgent | _Success?_ |
 | 3b | InvokeComplianceAgent | _token obtained?_ |
 | 4 | Check | _result_ |
+
+### Raw output: step 1 (13 Nov 2026)
+
+```text
+[ec2-user@ip-10-0-0-12 ~]$ ls ~/reference-code/compliance-agent/
+agent.py  compliance-agent.service  test_token_fetch.py
+
+[ec2-user@ip-10-0-0-12 ~]$ grep -n -i -E "ssm|get_parameter|WithDecryption|workload" ~/reference-code/compliance-agent/agent.py | head -20
+4:This agent authenticates to AgentCore Identity by fetching a workload access
+5:token. It reads the workload identity ARN from an SSM parameter at startup,
+8:Without a valid workload identity and scoped IAM permissions, this agent
+20:SSM_PARAM_NAME = "/compliance-agent/workload-identity-arn"
+41:def get_identity_arn(ssm_client):
+42:    """Read workload identity ARN from SSM parameter."""
+44:        response = ssm_client.get_parameter(Name=SSM_PARAM_NAME)
+46:    except ssm_client.exceptions.ParameterNotFound:
+49:        logger.error("Failed to read SSM parameter: %s", e)
+54:    """Attempt to get a workload access token."""
+55:    # ARN format: arn:aws:bedrock-agentcore:REGION:ACCOUNT:workload-identity-directory/default/workload-identity/NAME
+56:    workload_name = identity_arn.split("/")[-1]
+57:    response = agentcore_client.get_workload_access_token(
+58:        workloadName=workload_name
+69:    ssm_client = boto3.client("ssm", region_name=region)
+72:    # Wait for SSM parameter to be configured
+73:    logger.info("Reading identity ARN from SSM parameter: %s", SSM_PARAM_NAME)
+74:    identity_arn = get_identity_arn(ssm_client)
+78:            "SSM parameter '%s' not found. "
+79:            "Agent cannot authenticate without a workload identity.",
+
+[ec2-user@ip-10-0-0-12 ~]$ aws bedrock-agentcore-control create-workload-identity --name compliance-audit-agent --tags '{"Team":"compliance"}'
+{
+    "name": "compliance-audit-agent",
+    "workloadIdentityArn": "arn:aws:bedrock-agentcore:us-east-1:987347315034:workload-identity-directory/default/workload-identity/compliance-audit-agent",
+    "allowedResourceOauth2ReturnUrls": []
+}
+```
+
+**What the code tells us:**
+- The agent reads the parameter **without** `WithDecryption`, so the parameter must be **String**. A SecureString would come back encrypted.
+- It takes the **last `/` segment** of the ARN as the `workloadName` for `GetWorkloadAccessToken`. A wrong ARN, or a trailing `/` or space, breaks it even if the parameter exists.
+- It reads the parameter **at startup**, which is why `RestartComplianceAgent` must run after the parameter is created.
