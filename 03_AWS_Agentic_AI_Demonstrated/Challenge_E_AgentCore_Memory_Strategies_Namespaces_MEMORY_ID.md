@@ -1,5 +1,6 @@
 # Challenge E: Configure AgentCore Memory for conversation persistence
 
+> **Status:** ✅ Passed, *Meets Requirements* (exam lab, 13 Nov 2026)
 > **Lab:** [03 · AWS Agentic AI Demonstrated](README.md) · **Services:** Amazon Bedrock **AgentCore Memory** (short-term events + long-term strategies: semantic, user preference, summary), AgentCore Runtime (env var), Strands `AgentCoreMemorySessionManager`
 > **HLD label:** **E**, the orchestrator ↔ **AgentCore Memory** arrow. See [HLD](README.md#-high-level-design-hld).
 
@@ -7,12 +8,12 @@
 
 ## ✅ Status checklist
 
-- [ ] 1 · AgentCore → **Memory** → create `supply_chain_memory` (event expiry, e.g. **30 days**)
-- [ ] 2 · Add 3 long-term strategies with the **exact** namespaces: **Semantic** `supplychain/user/{actorId}/semantic` · **User preference** `supplychain/user/{actorId}/preferences` · **Summary** `supplychain/user/{actorId}/session/{sessionId}/summary`
-- [ ] 3 · Wait for **Active** → copy the **Memory ID**
-- [ ] 4 · Orchestrator `orchestrator_runtime_8bc8fd20` → env **`MEMORY_ID`** = memory ID (keep the other vars)
-- [ ] 5 · Chat: `My name is Alex and I prefer detailed reports.` → **wait 60 s** → **new session** → `What do you know about my preferences?`
-- [ ] 6 · **Check** (at least 60 s after step 5's first message)
+- [x] 1 · AgentCore → **Memory** → create `supply_chain_memory` (event expiry, e.g. **30 days**)
+- [x] 2 · Add 3 long-term strategies with the **exact** namespaces: **Semantic** `supplychain/user/{actorId}/semantic` · **User preference** `supplychain/user/{actorId}/preferences` · **Summary** `supplychain/user/{actorId}/session/{sessionId}/summary`
+- [x] 3 · Wait for **Active** → copy the **Memory ID**
+- [x] 4 · Orchestrator `orchestrator_runtime_8bc8fd20` → env **`MEMORY_ID`** = memory ID (keep the other vars)
+- [x] 5 · Chat: `My name is Alex and I prefer detailed reports.` → **wait 60 s** → **new session** → `What do you know about my preferences?`
+- [x] 6 · **Check** (at least 60 s after step 5's first message)
 
 ---
 
@@ -189,7 +190,7 @@ Click **Check** at least **60 s** after the preference message.
 
 ## ⚠️ Mistakes & lessons
 
-_Fill in as I go. Screenshots go in `assets/challenge_E/`._
+_None recorded during the lab. Passed, Meets Requirements._
 
 ---
 
@@ -243,4 +244,4 @@ Logs: **CloudWatch** → `/aws/bedrock-agentcore/runtimes/<orchestrator-id>-DEFA
 | 1–2 | Created memory + 3 strategies | _ID = ?, Active?_ |
 | 3 | Orchestrator `MEMORY_ID` | _saved, version = ?_ |
 | 4 | Chat preference → 60 s → new session | _recalled?_ |
-| 5 | Check | _result_ |
+| 5 | Check | ✅ Meets Requirements (exam result, 13 Nov 2026) |

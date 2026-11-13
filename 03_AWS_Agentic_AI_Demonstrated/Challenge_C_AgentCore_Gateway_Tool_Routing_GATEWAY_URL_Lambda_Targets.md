@@ -1,5 +1,6 @@
 # Challenge C: Troubleshoot AgentCore Gateway tool routing
 
+> **Status:** ✅ Passed, *Meets Requirements* (exam lab, 13 Nov 2026)
 > **Lab:** [03 · AWS Agentic AI Demonstrated](README.md) · **Services:** Amazon Bedrock AgentCore (**Gateway**, gateway **targets**, Runtime env vars), AWS Lambda (domain handlers), Amazon S3 (tool schemas), IAM (gateway service role)
 > **HLD label:** **C**, the orchestrator's *MCP tools* arrow → **AgentCore Gateway** → 4 Lambda targets → DynamoDB. See [HLD](README.md#-high-level-design-hld).
 
@@ -7,12 +8,12 @@
 
 ## ✅ Status checklist
 
-- [ ] 1 · Gateway page: copy the **gateway URL** (`https://…gateway.bedrock-agentcore.us-east-1.amazonaws.com/mcp`) and look at the existing targets' settings
-- [ ] 2 · Orchestrator runtime → env var **`GATEWAY_URL`** = gateway URL (keep `GUARDRAIL_*`, `COGNITO_*`)
-- [ ] 3 · **`logistics-target`** → Lambda ARN = `logistics-handler-8bc8fd20` (it currently points at the inventory handler)
-- [ ] 4 · **Create `quality-target`**: Lambda `quality-handler-8bc8fd20` + S3 schema `quality_tools.json` + IAM-role credential provider
-- [ ] 5 · Chat UI: inventory, supplier, logistics and quality questions each answered from the right domain
-- [ ] 6 · **Check**
+- [x] 1 · Gateway page: copy the **gateway URL** (`https://…gateway.bedrock-agentcore.us-east-1.amazonaws.com/mcp`) and look at the existing targets' settings
+- [x] 2 · Orchestrator runtime → env var **`GATEWAY_URL`** = gateway URL (keep `GUARDRAIL_*`, `COGNITO_*`)
+- [x] 3 · **`logistics-target`** → Lambda ARN = `logistics-handler-8bc8fd20` (it currently points at the inventory handler)
+- [x] 4 · **Create `quality-target`**: Lambda `quality-handler-8bc8fd20` + S3 schema `quality_tools.json` + IAM-role credential provider
+- [x] 5 · Chat UI: inventory, supplier, logistics and quality questions each answered from the right domain
+- [x] 6 · **Check**
 
 ---
 
@@ -203,7 +204,7 @@ A **tool error** for one domain means that target's Lambda ARN or schema is wron
 
 ## ⚠️ Mistakes & lessons
 
-_Fill in as I go. Screenshots go in `assets/challenge_C/`._
+_None recorded during the lab. Passed, Meets Requirements._
 
 ---
 
@@ -252,4 +253,4 @@ Logs: **CloudWatch** → `/aws/lambda/logistics-handler-8bc8fd20`, `/aws/lambda/
 | 3 | logistics-target ARN | _READY?_ |
 | 4 | quality-target created | _READY?_ |
 | 5 | Chat: 4 domains | _?_ |
-| 6 | Check | _result_ |
+| 6 | Check | ✅ Meets Requirements (exam result, 13 Nov 2026) |

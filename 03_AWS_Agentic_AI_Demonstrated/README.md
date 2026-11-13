@@ -3,23 +3,42 @@
 > **Lab:** "AWS Agentic AI Demonstrated", one of the challenge sets for the AWS Partner FDE credential.
 > **Theme:** finish a **half-done migration to Amazon Bedrock AgentCore** for *AnyCompany Logistics'* supply chain app. The work covers OAuth 2.0 (Cognito), AgentCore Gateway tool routing, a knowledge base on OpenSearch Serverless, a KB-specialist **AgentCore Runtime**, **AgentCore Memory**, **Bedrock Guardrails** and **VPC networking** for runtimes.
 > **Region:** `us-east-1` only · **Time limit:** **130 minutes** (no pause, no restart) · **Retake wait if failed:** **25 days**
-> **Started:** 13 Nov 2026 · **Status legend:** ✅ passed · 🟡 in progress · ⬜ not started · ⚠️ needs improvement
+> **Started:** 13 Nov 2026 · **Passed:** 13 Nov 2026 (6/6 Meets Requirements) · **Status legend:** ✅ passed · 🟡 in progress · ⬜ not started · ⚠️ needs improvement
 > **Back to:** [Vault index](../README.md) · Previous lab: [02 Databases for Agentic AI](../02_AWS_Databases_For_Agentic_AI_Demonstrated/README.md)
 
 ---
 
-## 🏆 Result: _pending_
+## 🏆 Result: PASSED (6 of 6 Meets Requirements)
 
 | | |
 |---|---|
 | **Microcredential** | AWS Agentic AI Demonstrated |
-| **Result** | 🟡 In progress |
-| **Pass date** | _—_ |
-| **Valid until** | _—_ (Labs 01/02 were valid for one year from the pass date) |
-| **Renew / retake from** | _—_ (Labs 01/02: 9 months after passing) |
+| **Result** | ✅ **PASSED**, all required objectives met |
+| **Pass date** | 13 Nov 2026 (_add the time from the result page_) |
+| **Valid until** | 13 Nov 2027 (one year, the same as Labs 01/02; confirm on the result page) |
+| **Renew / retake from** | ~10 Aug 2027 (Labs 01/02 opened renewal 270 days after passing; confirm on the result page) |
 | **Badge** | Claim it from the **Credly** email, then add it to the **AWS Skills Profile** |
 
 _Add the result screenshot as `assets/00_exam_result_passed.png` when I have it._
+
+**Performance report** (every row *Meets Requirements*):
+
+| Task statement | Challenge | Result |
+|---|---|---|
+| Configure content safety by using Amazon Bedrock Guardrails | [A](Challenge_A_Bedrock_Guardrails_Content_Safety_Word_PII_Regex_Filters.md) | ✅ Meets Requirements |
+| Configure OAuth 2.0 authentication | [B](Challenge_B_Cognito_OAuth2_M2M_Client_Credentials_JWT_Authorizers.md) | ✅ Meets Requirements |
+| Troubleshoot AgentCore Gateway tool routing | [C](Challenge_C_AgentCore_Gateway_Tool_Routing_GATEWAY_URL_Lambda_Targets.md) | ✅ Meets Requirements |
+| Deploy the knowledge base and knowledge base specialist agent runtime | [D](Challenge_D_Bedrock_KB_OpenSearch_Serverless_KB_Specialist_Runtime_A2A.md) | ✅ Meets Requirements |
+| Configure AgentCore Memory for conversation persistence | [E](Challenge_E_AgentCore_Memory_Strategies_Namespaces_MEMORY_ID.md) | ✅ Meets Requirements |
+| Secure agent runtimes by using VPC networking | [F](Challenge_F_VPC_Networking_Interface_Endpoints_PrivateLink_Runtimes.md) | ✅ Meets Requirements |
+
+_The rows use the task-card titles. Match the order and wording to the report screenshot when I add it._
+
+**Before renewing (from ~10 Aug 2027):**
+1. Re-read the **🔑 Lab resources** and **🧠 Lessons** sections below.
+2. Do the challenges in dependency order: **B → C** (the gateway's JWT authorizer needs B's client ID) and **D → F** (F moves D's specialist runtime into the VPC). Start the **KB sync** in D early. **A** and **E** stand on their own.
+3. **Five of the six challenges edit the same orchestrator runtime** (`GUARDRAIL_ID`, `COGNITO_*`, `GATEWAY_URL`, `KB_SPECIALIST_RUNTIME_ARN`, `MEMORY_ID`, then its network mode). After each save, check the earlier env vars are still there.
+4. Copy fresh ARNs from the panel, because the suffix changes on every launch.
 
 ---
 
@@ -227,14 +246,14 @@ The lettered circles on the diagram mark where each challenge happens. I read **
 
 | # | Challenge | Key services | Status | Notes |
 |---|---|---|---|---|
-| A | Configure content safety by using Amazon Bedrock Guardrails | Guardrails (content filters High, word filter + profanity, PII USERNAME mask / PASSWORD block, regex DISC mask), orchestrator runtime `GUARDRAIL_ID` | 🟡 In progress | [Challenge_A](Challenge_A_Bedrock_Guardrails_Content_Safety_Word_PII_Regex_Filters.md) |
-| B | Configure OAuth 2.0 authentication | Cognito M2M app client (secret, client_credentials, `supplychain/read`+`write`), Gateway + orchestrator runtime JWT `allowedClients`, chat Lambda env (`ORCHESTRATOR_RUNTIME_ARN`, `COGNITO_*`), runtime env `COGNITO_*` | 🟡 In progress | [Challenge_B](Challenge_B_Cognito_OAuth2_M2M_Client_Credentials_JWT_Authorizers.md) |
-| C | Troubleshoot AgentCore Gateway tool routing | Orchestrator env `GATEWAY_URL` (gateway `…/mcp` URL), `logistics-target` → `logistics-handler-8bc8fd20`, create `quality-target` (quality Lambda + S3 `quality_tools.json` + gateway IAM role) | 🟡 In progress | [Challenge_C](Challenge_C_AgentCore_Gateway_Tool_Routing_GATEWAY_URL_Lambda_Targets.md) |
-| D | Deploy the knowledge base and KB specialist agent runtime | Bedrock KB (S3 `supply-chain-knowledge-8bc8fd20`, Titan V2, existing AOSS index `bedrock-knowledge-base-index`) + sync, runtime `kb_specialist_runtime` (S3 zip, `main.py`, HTTP, `PYTHON_3_11`, CUSTOM_JWT, env `MODEL_ID`/`KNOWLEDGE_BASE_ID`), DEFAULT endpoint, orchestrator `KB_SPECIALIST_RUNTIME_ARN` | 🟡 In progress | [Challenge_D](Challenge_D_Bedrock_KB_OpenSearch_Serverless_KB_Specialist_Runtime_A2A.md) |
-| E | Configure AgentCore Memory for conversation persistence | Memory `supply_chain_memory` (event expiry), strategies Semantic `supplychain/user/{actorId}/semantic`, UserPreference `…/preferences`, Summary `…/session/{sessionId}/summary`, orchestrator `MEMORY_ID`, test preference → 60 s → new session | 🟡 In progress | [Challenge_E](Challenge_E_AgentCore_Memory_Strategies_Namespaces_MEMORY_ID.md) |
-| F | Secure agent runtimes by using VPC networking | Interface endpoints (`bedrock-agentcore.gateway`, `bedrock-agentcore`, `bedrock-runtime`, `logs`; private DNS, private subnets, SG `sg-032a9b8fca027374f`), both runtimes Public → VPC, NAT route for Cognito | 🟡 In progress | [Challenge_F](Challenge_F_VPC_Networking_Interface_Endpoints_PrivateLink_Runtimes.md) |
+| A | Configure content safety by using Amazon Bedrock Guardrails | Guardrails (content filters High, word filter + profanity, PII USERNAME mask / PASSWORD block, regex DISC mask), orchestrator runtime `GUARDRAIL_ID` | ✅ Passed | [Challenge_A](Challenge_A_Bedrock_Guardrails_Content_Safety_Word_PII_Regex_Filters.md) |
+| B | Configure OAuth 2.0 authentication | Cognito M2M app client (secret, client_credentials, `supplychain/read`+`write`), Gateway + orchestrator runtime JWT `allowedClients`, chat Lambda env (`ORCHESTRATOR_RUNTIME_ARN`, `COGNITO_*`), runtime env `COGNITO_*` | ✅ Passed | [Challenge_B](Challenge_B_Cognito_OAuth2_M2M_Client_Credentials_JWT_Authorizers.md) |
+| C | Troubleshoot AgentCore Gateway tool routing | Orchestrator env `GATEWAY_URL` (gateway `…/mcp` URL), `logistics-target` → `logistics-handler-8bc8fd20`, create `quality-target` (quality Lambda + S3 `quality_tools.json` + gateway IAM role) | ✅ Passed | [Challenge_C](Challenge_C_AgentCore_Gateway_Tool_Routing_GATEWAY_URL_Lambda_Targets.md) |
+| D | Deploy the knowledge base and KB specialist agent runtime | Bedrock KB (S3 `supply-chain-knowledge-8bc8fd20`, Titan V2, existing AOSS index `bedrock-knowledge-base-index`) + sync, runtime `kb_specialist_runtime` (S3 zip, `main.py`, HTTP, `PYTHON_3_11`, CUSTOM_JWT, env `MODEL_ID`/`KNOWLEDGE_BASE_ID`), DEFAULT endpoint, orchestrator `KB_SPECIALIST_RUNTIME_ARN` | ✅ Passed | [Challenge_D](Challenge_D_Bedrock_KB_OpenSearch_Serverless_KB_Specialist_Runtime_A2A.md) |
+| E | Configure AgentCore Memory for conversation persistence | Memory `supply_chain_memory` (event expiry), strategies Semantic `supplychain/user/{actorId}/semantic`, UserPreference `…/preferences`, Summary `…/session/{sessionId}/summary`, orchestrator `MEMORY_ID`, test preference → 60 s → new session | ✅ Passed | [Challenge_E](Challenge_E_AgentCore_Memory_Strategies_Namespaces_MEMORY_ID.md) |
+| F | Secure agent runtimes by using VPC networking | Interface endpoints (`bedrock-agentcore.gateway`, `bedrock-agentcore`, `bedrock-runtime`, `logs`; private DNS, private subnets, SG `sg-032a9b8fca027374f`), both runtimes Public → VPC, NAT route for Cognito | ✅ Passed | [Challenge_F](Challenge_F_VPC_Networking_Interface_Endpoints_PrivateLink_Runtimes.md) |
 
-_Rows A–F are placeholders keyed to the diagram labels. I'll rename each one when I see its task card._
+_All six passed, Meets Requirements, on 13 Nov 2026._
 
 Each challenge file uses the same layout as Labs 01/02:
 1. status checklist
@@ -253,23 +272,22 @@ Each challenge file uses the same layout as Labs 01/02:
 
 ```text
 03_AWS_Agentic_AI_Demonstrated/
-├── README.md ................................. you are here (scope + resources + HLD + tracker)
+├── README.md ................................. you are here (result + scope + resources + HLD + tracker)
 ├── Challenge_A_Bedrock_Guardrails_Content_Safety_Word_PII_Regex_Filters.md
 ├── Challenge_B_Cognito_OAuth2_M2M_Client_Credentials_JWT_Authorizers.md
 ├── Challenge_C_AgentCore_Gateway_Tool_Routing_GATEWAY_URL_Lambda_Targets.md
 ├── Challenge_D_Bedrock_KB_OpenSearch_Serverless_KB_Specialist_Runtime_A2A.md
 ├── Challenge_E_AgentCore_Memory_Strategies_Namespaces_MEMORY_ID.md
 ├── Challenge_F_VPC_Networking_Interface_Endpoints_PrivateLink_Runtimes.md
-├── Challenge_<X>_<Short_Title>.md ............ one file per challenge, added as I post them
 └── assets/
     ├── 00_architecture_hld.png ............... shared architecture diagram
+    ├── 00_exam_result_passed.png ............. result screenshot (to add)
     ├── challenge_A/ .......................... screenshots for Challenge A
     ├── challenge_B/ .......................... screenshots for Challenge B
     ├── challenge_C/ .......................... screenshots for Challenge C
     ├── challenge_D/ .......................... screenshots for Challenge D
     ├── challenge_E/ .......................... screenshots for Challenge E
-    ├── challenge_F/ .......................... screenshots for Challenge F
-    └── challenge_<X>/ ........................ screenshots (+ code/ for handler and schema files)
+    └── challenge_F/ .......................... screenshots for Challenge F
 ```
 
 ---
@@ -296,6 +314,13 @@ Each challenge file uses the same layout as Labs 01/02:
 
 ---
 
-## 🧠 Lessons from this lab (running list)
+## 🧠 Lessons from this lab
 
-_Added as I finish each challenge._
+- **Read a field/value table as one item's fields, not a list of items.** The guardrail notes listed *Regex pattern / Name / Action / Description* for **one** pattern, and I first created four patterns. I also pasted a note (*"type it exactly…"*) into the regex itself. Keep notes out of values, and check the item count before saving. *(A)*
+- **"Mask" and "Block" are different actions.** Criteria that say *anonymize* mean **Mask**. A regex set to Block stops the whole message instead of hiding the code. *(A)*
+- **The new AgentCore console has no "Runtime" nav item.** Runtimes are under **Agents**. *(A)*
+- **AgentCore has two ways to create an agent.** **Harness** is config-only (model + prompt + tools). **Deploy your own code** is a Runtime (S3/ECR source, entry point, protocol, role, inbound auth, env vars). A task that says *"deploy from the S3 code artifact"* means the second one. Cancel a wrong harness before creating it, because the name can't be reused. *(D)*
+- **An `s3:PutObject` denial on a timestamped key means the console is trying to upload.** Pick the **existing S3 location** option and point at the zip the lab provides. *(D)*
+- **Look up the vector index's field names before creating the KB.** In OpenSearch Serverless they're on the collection's **Indexes** tab, not Overview, and the KB field mapping can't be edited after creation. *(D)*
+- **One shared resource, many challenges.** A–F all changed `orchestrator_runtime_…`. Each save makes a new version, so check that earlier challenges' env vars survive later edits. *(A–F)*
+- **Long-term memory needs time.** Wait about 60 s after the first message before testing recall in a new session, and before pressing **Check**. *(E)*

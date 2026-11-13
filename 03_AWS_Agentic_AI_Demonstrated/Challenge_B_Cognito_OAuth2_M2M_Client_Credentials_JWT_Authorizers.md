@@ -1,5 +1,6 @@
 # Challenge B: Configure OAuth 2.0 authentication (Cognito M2M, JWT authorizers)
 
+> **Status:** ✅ Passed, *Meets Requirements* (exam lab, 13 Nov 2026)
 > **Lab:** [03 · AWS Agentic AI Demonstrated](README.md) · **Services:** Amazon Cognito (user pool, app client, resource server, OAuth 2.0 client credentials), Amazon Bedrock AgentCore (Gateway + Runtime **inbound JWT authorizer**), AWS Lambda (chat handler env vars)
 > **HLD label:** **B**, the dashed *OAuth token* (chat Lambda → orchestrator runtime) and *Gateway token* (orchestrator → Gateway) arrows. See [HLD](README.md#-high-level-design-hld).
 
@@ -7,13 +8,13 @@
 
 ## ✅ Status checklist
 
-- [ ] 1 · Cognito: create a **machine-to-machine** app client (client secret + `client_credentials` + scopes `supplychain/read`, `supplychain/write`). Copy the **client ID**.
+- [x] 1 · Cognito: create a **machine-to-machine** app client (client secret + `client_credentials` + scopes `supplychain/read`, `supplychain/write`). Copy the **client ID**.
 - [ ] 2 · (Optional, 1 min) Test the token endpoint returns an `access_token`
-- [ ] 3 · AgentCore **Gateway** → inbound JWT authorizer → **Allowed clients** = new client ID
-- [ ] 4 · AgentCore **orchestrator runtime** → inbound JWT authorizer → **Allowed clients** = new client ID, **plus** env vars `COGNITO_DOMAIN`, `COGNITO_CLIENT_ID`, `COGNITO_USER_POOL_ID` (keep `GUARDRAIL_ID` from A)
-- [ ] 5 · Lambda **chat handler** → env vars `ORCHESTRATOR_RUNTIME_ARN`, `COGNITO_DOMAIN`, `COGNITO_CLIENT_ID`, `COGNITO_USER_POOL_ID`
-- [ ] 6 · Chat UI returns a response from the orchestrator
-- [ ] 7 · **Check**
+- [x] 3 · AgentCore **Gateway** → inbound JWT authorizer → **Allowed clients** = new client ID
+- [x] 4 · AgentCore **orchestrator runtime** → inbound JWT authorizer → **Allowed clients** = new client ID, **plus** env vars `COGNITO_DOMAIN`, `COGNITO_CLIENT_ID`, `COGNITO_USER_POOL_ID` (keep `GUARDRAIL_ID` from A)
+- [x] 5 · Lambda **chat handler** → env vars `ORCHESTRATOR_RUNTIME_ARN`, `COGNITO_DOMAIN`, `COGNITO_CLIENT_ID`, `COGNITO_USER_POOL_ID`
+- [x] 6 · Chat UI returns a response from the orchestrator
+- [x] 7 · **Check**
 
 ---
 
@@ -225,7 +226,7 @@ If it fails: **CloudWatch** → Log groups → `/aws/lambda/<chat-handler>` → 
 
 ## ⚠️ Mistakes & lessons
 
-_Fill in as I go. Screenshots go in `assets/challenge_B/`._
+_None recorded during the lab. Passed, Meets Requirements._
 
 ---
 
@@ -285,4 +286,4 @@ _Fill in as I go. Screenshots go in `assets/challenge_B/`._
 | 4 | Runtime allowedClients + env | _ARN = ?, new version = ?_ |
 | 5 | Lambda env vars | _saved?_ |
 | 6 | Chat UI | _reply?_ |
-| 7 | Check | _result_ |
+| 7 | Check | ✅ Meets Requirements (exam result, 13 Nov 2026) |

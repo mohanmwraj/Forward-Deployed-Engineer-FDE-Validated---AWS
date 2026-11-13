@@ -1,5 +1,6 @@
 # Challenge F: Secure agent runtimes by using VPC networking
 
+> **Status:** ✅ Passed, *Meets Requirements* (exam lab, 13 Nov 2026)
 > **Lab:** [03 · AWS Agentic AI Demonstrated](README.md) · **Services:** Amazon VPC (**interface endpoints / AWS PrivateLink**, private DNS, NAT gateway, route tables, security groups), Amazon Bedrock AgentCore Runtime (**network mode PUBLIC → VPC**)
 > **HLD label:** **F**, the **VPC** box: private subnets (both runtimes + SG + VPC endpoints) and the public subnet (NAT gateway). See [HLD](README.md#-high-level-design-hld).
 
@@ -7,18 +8,18 @@
 
 ## ✅ Status checklist
 
-- [ ] 0 · Check: VPC **DNS hostnames + DNS resolution = enabled**. Private subnets' route table has **`0.0.0.0/0 → nat-…`** (+ the S3 gateway endpoint)
-- [ ] 1 · Create **4 interface endpoints** in `vpc-0fa96be71c8360660`, private subnets, SG `sg-032a9b8fca027374f`, **private DNS on**:
+- [x] 0 · Check: VPC **DNS hostnames + DNS resolution = enabled**. Private subnets' route table has **`0.0.0.0/0 → nat-…`** (+ the S3 gateway endpoint)
+- [x] 1 · Create **4 interface endpoints** in `vpc-0fa96be71c8360660`, private subnets, SG `sg-032a9b8fca027374f`, **private DNS on**:
   - `bedrock-agentcore.gateway`
   - `bedrock-agentcore` (data plane)
   - `bedrock-runtime`
   - `logs`
 - [ ] 1b · (Optional, recommended) `bedrock-agent-runtime` endpoint for KB `Retrieve`
-- [ ] 2 · Wait for the endpoints to show **Available**
-- [ ] 3 · `orchestrator_runtime_8bc8fd20` → **Edit** → network **VPC** (VPC, **both private subnets**, same SG) → Save → **READY**
-- [ ] 4 · `kb_specialist_runtime` → same → **READY**
-- [ ] 5 · Chat UI: a tool question (inventory/logistics) **and** a KB question both answer
-- [ ] 6 · **Check**
+- [x] 2 · Wait for the endpoints to show **Available**
+- [x] 3 · `orchestrator_runtime_8bc8fd20` → **Edit** → network **VPC** (VPC, **both private subnets**, same SG) → Save → **READY**
+- [x] 4 · `kb_specialist_runtime` → same → **READY**
+- [x] 5 · Chat UI: a tool question (inventory/logistics) **and** a KB question both answer
+- [x] 6 · **Check**
 
 ---
 
@@ -219,7 +220,7 @@ Repeat for **`kb_specialist_runtime`**. You can start the second edit while the 
 
 ## ⚠️ Mistakes & lessons
 
-_Fill in as I go. Screenshots go in `assets/challenge_F/`._
+_None recorded during the lab. Passed, Meets Requirements._
 
 ---
 
@@ -279,4 +280,4 @@ _Fill in as I go. Screenshots go in `assets/challenge_F/`._
 | 3 | Orchestrator → VPC | _READY?_ |
 | 4 | Specialist → VPC | _READY?_ |
 | 5 | Chat: tool + KB | _?_ |
-| 6 | Check | _result_ |
+| 6 | Check | ✅ Meets Requirements (exam result, 13 Nov 2026) |

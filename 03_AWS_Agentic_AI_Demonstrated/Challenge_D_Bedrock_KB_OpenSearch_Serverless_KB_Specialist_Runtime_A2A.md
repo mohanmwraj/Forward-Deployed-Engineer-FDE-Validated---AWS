@@ -1,5 +1,6 @@
 # Challenge D: Deploy the knowledge base and knowledge base specialist agent runtime
 
+> **Status:** ✅ Passed, *Meets Requirements* (exam lab, 13 Nov 2026)
 > **Lab:** [03 · AWS Agentic AI Demonstrated](README.md) · **Services:** Amazon Bedrock **Knowledge Bases** (OpenSearch Serverless vector store, Titan Text Embeddings V2), Amazon S3, Amazon OpenSearch Serverless, Amazon Bedrock **AgentCore Runtime** (direct code deploy from S3, CUSTOM_JWT authorizer, endpoint), A2A
 > **HLD label:** **D**, the **KB specialist runtime** (Nova Lite) → **Bedrock KB** → **OpenSearch Serverless**, plus the orchestrator → specialist **A2A** arrow. See [HLD](README.md#-high-level-design-hld).
 
@@ -7,14 +8,14 @@
 
 ## ✅ Status checklist
 
-- [ ] 0 · Gather: `KnowledgeBaseRoleArn` (panel / IAM), OpenSearch index `bedrock-knowledge-base-index` **field names**, B's **client ID**
-- [ ] 1 · Bedrock → **Create KB**: S3 `supply-chain-knowledge-8bc8fd20`, Titan Text Embeddings **V2**, existing **OpenSearch Serverless** collection + index → copy **KB ID**
-- [ ] 2 · Data source → **Sync** (start early, it runs while you do Step 3)
-- [ ] 3 · AgentCore → **create runtime** `kb_specialist_runtime` from S3 zip (`main.py`, HTTP, `PYTHON_3_11`, role `KBSpecialistRuntimeRole-8bc8fd20`, **CUSTOM_JWT**, env `MODEL_ID` + `KNOWLEDGE_BASE_ID`)
-- [ ] 4 · Specialist **endpoint** (DEFAULT) is **READY**
-- [ ] 5 · Orchestrator env **`KB_SPECIALIST_RUNTIME_ARN`** = specialist runtime ARN (keep the other vars)
-- [ ] 6 · Chat UI: a KB question returns passages from the supply chain docs
-- [ ] 7 · **Check**
+- [x] 0 · Gather: `KnowledgeBaseRoleArn` (panel / IAM), OpenSearch index `bedrock-knowledge-base-index` **field names**, B's **client ID**
+- [x] 1 · Bedrock → **Create KB**: S3 `supply-chain-knowledge-8bc8fd20`, Titan Text Embeddings **V2**, existing **OpenSearch Serverless** collection + index → copy **KB ID**
+- [x] 2 · Data source → **Sync** (start early, it runs while you do Step 3)
+- [x] 3 · AgentCore → **create runtime** `kb_specialist_runtime` from S3 zip (`main.py`, HTTP, `PYTHON_3_11`, role `KBSpecialistRuntimeRole-8bc8fd20`, **CUSTOM_JWT**, env `MODEL_ID` + `KNOWLEDGE_BASE_ID`)
+- [x] 4 · Specialist **endpoint** (DEFAULT) is **READY**
+- [x] 5 · Orchestrator env **`KB_SPECIALIST_RUNTIME_ARN`** = specialist runtime ARN (keep the other vars)
+- [x] 6 · Chat UI: a KB question returns passages from the supply chain docs
+- [x] 7 · **Check**
 
 ---
 
@@ -370,4 +371,4 @@ Logs: **CloudWatch** → `/aws/bedrock-agentcore/runtimes/kb_specialist_runtime-
 | 4 | Endpoint | _DEFAULT READY?_ |
 | 5 | Orchestrator `KB_SPECIALIST_RUNTIME_ARN` | _saved?_ |
 | 6 | Chat KB question | _passages?_ |
-| 7 | Check | _result_ |
+| 7 | Check | ✅ Meets Requirements (exam result, 13 Nov 2026) |

@@ -1,6 +1,6 @@
 # 🅰️ Challenge A: Configure content safety by using Amazon Bedrock Guardrails
 
-> **Status:** 🟡 In progress · **Diagram label:** A (Amazon Bedrock Guardrails, on the orchestrator's *PII / content filtering* arrow)
+> **Status:** ✅ Passed, *Meets Requirements* (exam lab, 13 Nov 2026) · **Diagram label:** A (Amazon Bedrock Guardrails, on the orchestrator's *PII / content filtering* arrow)
 > **Services:** Amazon Bedrock Guardrails (content filters, word filters + profanity, sensitive information: PII + regex, blocked messaging), Amazon Bedrock AgentCore Runtime (env vars)
 > **Lab:** [AWS Agentic AI Demonstrated](README.md) · **Vault:** [index](../README.md)
 
@@ -8,15 +8,15 @@
 
 ## ✅ Status checklist (success criteria)
 
-- [ ] The orchestrator agent **blocks mentions of Project Meridian**, **anonymizes discount codes** in responses, **blocks PII** and **filters harmful content**
+- [x] The orchestrator agent **blocks mentions of Project Meridian**, **anonymizes discount codes** in responses, **blocks PII** and **filters harmful content**
 
 Broken down by configuration item (from *Main areas to investigate*):
 
-- [ ] A guardrail exists with **custom blocked messaging** for inputs **and** outputs
-- [ ] **Word filter:** custom word `Project Meridian` + **profanity filter** enabled
-- [ ] **Sensitive info:** regex `DISC-[A-Z]{3}-\d{4}` → **anonymize (mask)**, `USERNAME` → **anonymize (mask)**, `PASSWORD` → **block**
-- [ ] **Content filters:** `HATE`, `INSULTS`, `MISCONDUCT`, `VIOLENCE` at **HIGH**
-- [ ] The orchestrator runtime's **`GUARDRAIL_ID`** env var = the guardrail ID (`GUARDRAIL_VERSION` is already `DRAFT`)
+- [x] A guardrail exists with **custom blocked messaging** for inputs **and** outputs
+- [x] **Word filter:** custom word `Project Meridian` + **profanity filter** enabled
+- [x] **Sensitive info:** regex `DISC-[A-Z]{3}-\d{4}` → **anonymize (mask)**, `USERNAME` → **anonymize (mask)**, `PASSWORD` → **block**
+- [x] **Content filters:** `HATE`, `INSULTS`, `MISCONDUCT`, `VIOLENCE` at **HIGH**
+- [x] The orchestrator runtime's **`GUARDRAIL_ID`** env var = the guardrail ID (`GUARDRAIL_VERSION` is already `DRAFT`)
 
 ---
 
@@ -376,4 +376,4 @@ AgentCore Runtime configuration (container/code, env vars, network mode, auth) i
 | 3 | Looked for "Runtime" in the AgentCore nav | Not there. The new console lists runtimes under **Agents** (screenshot `06_…`) |
 | 2 | Test panel: Meridian / password / DISC code / username / insult | _blocked/masked?_ |
 | 3 | Orchestrator runtime `GUARDRAIL_ID` | _value, new version = ?_ |
-| 5 | Check | _result_ |
+| 5 | Check | ✅ Meets Requirements (exam result, 13 Nov 2026) |
