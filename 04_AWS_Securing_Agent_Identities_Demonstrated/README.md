@@ -237,7 +237,7 @@ Open any service by typing its name in the **top search bar**, then follow the p
 | Lambda test | Lambda → function → **Test** tab → event JSON → **Test** | CloudShell: `aws lambda invoke` |
 | Cognito pools / app clients | Cognito → **User pools** → pool → left nav ***Applications*** → **App clients** / **Resource servers** ✔️ (not under Branding → Domain) / *MCP auth*. *Branding* → **Domain** = Cognito domain + Issuer (the pool ID is in the JWKS URL). App client OAuth: client → **Login pages** → **Edit** | CloudShell: `aws cognito-idp …` |
 | CloudTrail trail + data events | CloudTrail → **Trails** → **Create trail** (or the trail → **Edit**) → *Data events* → resource type | CloudShell: `aws cloudtrail put-event-selectors --advanced-event-selectors` |
-| CloudWatch log metric filter | CloudWatch → **Logs** → **Log groups** → group → **Metric filters** tab → **Create metric filter** | CloudShell: `aws logs put-metric-filter` |
+| CloudWatch log metric filter | CloudWatch → **Logs** → **Log Management** ✔️ (the newer name for *Log groups*) → group → **Metric filters** tab → **Create metric filter**. Alarm from a filter: tick the filter card → **Create alarm ↗** (opens a new tab, metric pre-filled) | CloudShell: `aws logs put-metric-filter` |
 | CloudWatch alarm | CloudWatch → **Alarms** → **All alarms** → **Create alarm** → metric → conditions → **SNS topic** | CloudShell: `aws cloudwatch put-metric-alarm` |
 | SNS topic | SNS → **Topics** → topic (ARN for alarm actions) | CloudShell: `aws sns list-topics` |
 | **CloudTrail** | CloudTrail → **Event history** (management events), or the trail's log group | Who called which token API, and the `errorCode` |

@@ -156,11 +156,25 @@ aws cloudtrail get-trail-status --name identity-audit-trail --query IsLogging
 
 **UI:**
 1. **CloudWatch** → **Alarms** → **All alarms** → **Create alarm** → **Select metric**.
-2. **Browse** → *AWS namespaces* → **Bedrock-AgentCore** → **Metrics with no dimensions** → ✅ **WorkloadAccessTokenFetchFailures** → **Select metric**.
+2. **Browse** → click the **Bedrock-AgentCore** tile → **Metrics with no dimensions** → ✅ **WorkloadAccessTokenFetchFailures** → **Select metric** (bottom right).
+
+   ![CloudWatch Select metric dialog: Browse tab with namespace tiles; Bedrock-AgentCore (69) is the one to click](assets/challenge_E/02_alarm_select_metric_browse_namespaces.png)
+
+   The **Browse** tab shows namespace **tiles** (ApiGateway, Bedrock, **Bedrock-AgentCore**, Billing, …).
+   - Click **Bedrock-AgentCore**, then the **Metrics with no dimensions** group. Or type `WorkloadAccessTokenFetchFailures` in the filter box.
+   - The bottom-right button reads *"Select a single metric to continue"* until exactly one metric is ticked.
+   - On the next page, **Statistic defaults to Average**, so change it to **Sum**.
 3. **Statistic:** **Sum** · **Period:** **5 minutes**.
 4. **Conditions:** Threshold type **Static** · **Greater** · than **`5`** → **Next**.
 5. **Notification:** Alarm state trigger **In alarm** → **Select an existing SNS topic** → `IdentityAlertsTopic…` → **Next**.
 6. Alarm name `IdentityAuthFailures-Operational` → **Next** → **Create alarm**.
+
+![Alarms list: IdentityAuthFailures-Operational, Insufficient data, Actions enabled, condition WorkloadAccessTokenFetchFailures > 5 for 1 datapoints within 5 minutes](assets/challenge_E/03_alarm_identityauthfailures_operational_created.png)
+
+The expected result:
+- State **Insufficient data**. That's not an error; there are just no datapoints yet.
+- Condition `WorkloadAccessTokenFetchFailures > 5 for 1 datapoints within 5 minutes`.
+- The red **Warning** next to *Actions enabled* usually means the SNS topic has no confirmed subscriber. Hover over it to read the reason. It doesn't change the alarm's configuration.
 
 **CLI:**
 ```bash
@@ -174,7 +188,7 @@ aws cloudwatch put-metric-alarm --alarm-name IdentityAuthFailures-Operational \
 ### Step 3: Metric filter `RestrictedAccountAccess`
 
 **UI:**
-1. CloudWatch → **Logs** → **Log groups** → search `portfolio_advisor_runtime` → open the group ending in **`-DEFAULT`**.
+1. CloudWatch → left nav **Logs** → **Log Management** (the newer name for *Log groups*) → search `portfolio_advisor_runtime` → open **`/aws/bedrock-agentcore/runtimes/portfolio_advisor_runtime_b4183f00-JSJfwQA6Al-DEFAULT`**.
 2. **Metric filters** tab → **Create metric filter**.
 3. **Filter pattern:** `RESTRICTED_ACCOUNT_X99`, with **no quotes**. Optional: **Test pattern** → pick a log stream → **Test pattern**, which should show matches. → **Next**.
 4. Fill in:
@@ -196,7 +210,11 @@ aws logs describe-metric-filters --log-group-name "$LG"
 
 ### Step 4: Alarm `RestrictedAccountAccess-Alert`
 
-**UI (shortcut):** in the same log group → **Metric filters** tab → ✅ tick **RestrictedAccountAccess** → **Create alarm**. The metric comes pre-filled. **Browse** may not show a brand-new metric until it has data.
+![Log group portfolio_advisor_runtime_b4183f00-JSJfwQA6Al-DEFAULT: Metric filter RestrictedAccountAccess created; Metric filters (1) tab with a greyed Create alarm button](assets/challenge_E/04_metric_filter_created_log_group.png)
+
+**UI (shortcut):** in the same log group → **Metric filters** tab → **scroll down** to the filter card → ✅ tick **RestrictedAccountAccess** → **Create alarm ↗**.
+- The button stays **greyed out until a filter is ticked**.
+- It opens in a **new tab** with the metric pre-filled. **Browse** may not show a brand-new metric until it has data.
 
 Then:
 1. **Sum** · **5 minutes** · **Static** · **Greater/Equal** · **`1`** → **Next**.
@@ -230,7 +248,26 @@ aws cloudwatch describe-alarms --alarm-names IdentityAuthFailures-Operational Re
 
 ## ⚠️ Mistakes & lessons
 
-_Fill in as I go. Screenshots go in `assets/challenge_E/`._
+### Mistake 1: The security alarm was created with **Greater** (`>`) instead of **Greater/Equal** (`>=`)
+
+![Alarms (2): RestrictedAccountAccess-Alert condition RestrictedAccountAccessAttempts > 1 (wrong), IdentityAuthFailures-Operational WorkloadAccessTokenFetchFailures > 5 (correct, state OK)](assets/challenge_E/05_mistake_restricted_alarm_greater_not_greater_equal.png)
+
+```text
+RestrictedAccountAccess-Alert       Insufficient data   RestrictedAccountAccessAttempts > 1 for 1 datapoints within 5 minutes   ❌ should be >= 1
+IdentityAuthFailures-Operational    OK                  WorkloadAccessTokenFetchFailures > 5 for 1 datapoints within 5 minutes  ✅
+```
+
+- **Why it's wrong:** with `> 1`, **one** restricted-account attempt in 5 minutes (Sum = 1) does **not** alarm. Security detection must fire on the **first** event. The criterion says *greater than or equal to 1*.
+- **Why it happened:** the alarm wizard's **Conditions** radio button defaulted to, or was left on, **Greater**. The first alarm needed Greater, so it was easy to carry over.
+- **Fix:** Alarms → `RestrictedAccountAccess-Alert` → **Actions ▾ → Edit** → Conditions **Greater/Equal**, threshold 1 → Next ×3 → **Update alarm**. Or use CLI `put-metric-alarm … --comparison-operator GreaterThanOrEqualToThreshold`, which overwrites it.
+- **How to check quickly:** the **Conditions** column on the Alarms list shows the operator (`>` vs `>=`). Read it after creating each alarm.
+- **Lesson:** when two similar items differ in one setting (`> 5` vs `>= 1`), check that setting on each one separately.
+
+**After the fix:**
+
+![Alarms (2) after the fix: RestrictedAccountAccess-Alert >= 1, In alarm; IdentityAuthFailures-Operational > 5, OK](assets/challenge_E/06_alarms_fixed_restricted_in_alarm.png)
+
+`RestrictedAccountAccess-Alert` went straight to **In alarm**. The agent's logs contain `RESTRICTED_ACCOUNT_X99`, so the filter emitted `1`, Sum ≥ 1, and the alarm fired. With the old `> 1` it would have stayed quiet, which is the same bug seen in practice.
 
 ---
 
@@ -246,6 +283,7 @@ _Fill in as I go. Screenshots go in `assets/challenge_E/`._
 | `RestrictedAccountAccessAttempts` not under Browse | Metric filters don't backfill. No new log lines yet | Use **Create alarm** from the Metric filters tab, or the CLI |
 | Filter pattern matches nothing in Test | Quotes or a typo | Exactly `RESTRICTED_ACCOUNT_X99`, no quotes |
 | Alarm in **Insufficient data** | Normal when there are no datapoints yet | Not a failure. The Check looks at the configuration |
+| Alarms list shows `> 1` for the security alarm | Conditions left on **Greater** | Edit → **Greater/Equal** (Mistake 1) |
 
 ---
 
@@ -281,7 +319,7 @@ _Fill in as I go. Screenshots go in `assets/challenge_E/`._
 |---|---|---|
 | 0 | TOPIC / LG | _ARN = ?, log group = ?_ |
 | 1 | Trail | _created? KMS none? Data only?_ |
-| 2 | Operational alarm | _created?_ |
-| 3 | Metric filter | _created? Test matches?_ |
-| 4 | Security alarm | _created?_ |
+| 2 | Operational alarm (console) | ✅ "Successfully created alarm IdentityAuthFailures-Operational". State **Insufficient data** (normal, no datapoints yet). Actions **enabled** with a *Warning* link (usually an SNS topic with no confirmed subscription, which doesn't affect the config). Condition `WorkloadAccessTokenFetchFailures > 5 for 1 datapoints within 5 minutes` |
+| 3 | Metric filter (console) | ✅ "Metric filter "RestrictedAccountAccess" has been created", Metric filters **(1)** on `/aws/bedrock-agentcore/runtimes/portfolio_advisor_runtime_b4183f00-JSJfwQA6Al-DEFAULT` (log class Standard, retention Never expire) |
+| 4 | Security alarm (console, via the filter) | Created, but the condition reads `RestrictedAccountAccessAttempts > 1` ❌ (Mistake 1), so edit it to **Greater/Equal**. Meanwhile `IdentityAuthFailures-Operational` → state **OK** at 13:36:20 UTC. ✅ **Fixed** ("Successfully updated alarm RestrictedAccountAccess-Alert"). Condition `RestrictedAccountAccessAttempts >= 1 for 1 datapoints within 5 minutes`. State **In alarm** at 13:41:17 UTC, which means the filter caught `RESTRICTED_ACCOUNT_X99` and detection works end to end |
 | 5 | Verify / Check | _result_ |
