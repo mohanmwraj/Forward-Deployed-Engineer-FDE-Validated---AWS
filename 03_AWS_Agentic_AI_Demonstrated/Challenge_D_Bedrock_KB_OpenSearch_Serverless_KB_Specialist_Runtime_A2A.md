@@ -294,6 +294,23 @@ The answer should quote or paraphrase **passages from the documents**, not a gen
 - **Side info from the same screen:** the banner confirmed the orchestrator is **`orchestrator_runtime_8bc8fd20`**, now at **Version 5**, with the DEFAULT endpoint moving to v5. The *"Update IAM execution role"* banner prompt can be ignored, because the lab pre-sets IAM.
 - **Lesson:** Overview says *"Create a new agent with the **harness**, or **deploy your own code** to the runtime"*. These are two different creation paths.
 
+### Mistake 2: `s3:PutObject` AccessDenied: the console tried to **upload** code instead of using the existing S3 zip
+
+![Create runtime error: AWSLabsUser not authorized to perform s3:PutObject on agent-schema-bucket-8bc8fd20/agent_code/1794531947733-fee8p6-strands_agent.zip](assets/challenge_D/05_mistake_s3_putobject_denied_upload_option.png)
+
+```text
+New agentic resource was not able to be successfully created: User: arn:aws:sts::574897117640:assumed-role/AWSLabsUser-…
+is not authorized to perform: s3:PutObject on resource:
+"arn:aws:s3:::agent-schema-bucket-8bc8fd20/agent_code/1794531947733-fee8p6-strands_agent.zip"
+because no identity-based policy allows the s3:PutObject action.
+```
+
+- **Right page:** **Create runtime** (*"deploying externally-developed runtimes"*). Name `kb_specialist_runtime`, *Runtime platform versions* V1/V2, *Compute type* microVMs/Instances.
+- **Why it failed:** the object name `…-strands_agent.zip` shows the code-source option was a **sample/template or upload** (the console zips code and **uploads** it to S3). The lab user has **no `s3:PutObject`**, by design: you must **point at the zip that already exists**.
+- **Fix:** in the code / agent source section, choose **existing S3 location / S3 URI** (*Browse S3*) → `s3://agent-schema-bucket-8bc8fd20/agent_code/kb_specialist_agent.zip`. **Not** "upload", "start from sample/template" or "Strands starter" ⚠️.
+- **Defaults kept:** Runtime platform **V1** (pre-selected) and Compute **microVMs**. The task doesn't specify these.
+- **Lesson:** an `s3:PutObject` denial on a *timestamped* key means the console is trying to upload. In labs, always choose the *existing artifact* option.
+
 ---
 
 ## 🧯 Troubleshooting
