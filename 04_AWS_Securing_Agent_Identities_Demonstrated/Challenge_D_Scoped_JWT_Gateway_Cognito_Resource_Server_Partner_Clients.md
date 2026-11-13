@@ -96,7 +96,7 @@ AFTER
 | Step | Where | UI path | CLI alternative |
 |---|---|---|---|
 | 0 | Cognito / IAM | Cognito → User pools → PartnerPool (pool ID, partner1 client ID). IAM → Roles → TradingGatewayRole (ARN) | CloudShell: `list-user-pools`, `list-user-pool-clients` |
-| 1 | **Cognito → PartnerPool → Branding → Domain → Resource servers** | **Create resource server** | CloudShell: `create-resource-server` |
+| 1 | **Cognito → PartnerPool → Applications → Resource servers** | **Create resource server** | CloudShell: `create-resource-server` |
 | 2 | **Cognito → App clients → partner1-integration → Login pages** | **Edit** → Client credentials + `portfolio-api/query` | CloudShell: `update-user-pool-client` (full replace ⚠️) |
 | 3 | **AgentCore → Resources → Gateways** | **Create gateway** (JWT, clients, scopes, claim, role, MCP) | Workstation: `create-gateway` |
 | 4 | **AgentCore → Gateways → trading-gateway → Targets** | **Add target** (Lambda + S3 schema + IAM role) | Workstation: `create-gateway-target` |
@@ -121,15 +121,17 @@ AFTER
 
 | Name | Value |
 |---|---|
-| User pool | **PartnerPool** → ID `us-east-1_…` _(fill in)_ |
-| Discovery URL | `https://cognito-idp.us-east-1.amazonaws.com/<PartnerPoolId>/.well-known/openid-configuration` |
+| User pool | **`PartnerPool-b4183f00`** (has a suffix) → ID **`us-east-1_HXxMBvLxV`** (read from the Domain page's Issuer URL; confirm with `echo $POOL`) |
+| Cognito domain | `https://anycompany-partners-b4183f00.auth.us-east-1.amazoncognito.com` (Hosted UI classic) → token endpoint `…/oauth2/token` |
+| Discovery URL | `https://cognito-idp.us-east-1.amazonaws.com/us-east-1_HXxMBvLxV/.well-known/openid-configuration`. **How to get it:** the console doesn't show it directly. Copy the **Token signing key URL** (`…/.well-known/jwks.json`, copy icon) from *Branding → Domain → Issuer* or *Overview*, and replace `jwks.json` with **`openid-configuration`**. Check it by opening it in a browser: it should return JSON with `"issuer"` and `jwks_uri`. Or in CloudShell: `echo "https://cognito-idp.us-east-1.amazonaws.com/$POOL/.well-known/openid-configuration"` |
 | Resource server | identifier `portfolio-api`, scopes `query`, `execute` → full scope strings `portfolio-api/query`, `portfolio-api/execute` |
-| partner1 client ID | _(fill in)_ |
-| partner2 client ID | _(fill in after step 5)_ |
+| partner1 client | name **`partner1-integration-b4183f00`** (lab suffix) → client ID **`3870k1r00ej1k1e53i6l52f2cg`** |
+| partner2 client | name **`partner2-integration`** (exact, no suffix) → client ID **`49m0ddismu02mbk1bcuu8bp2ft`** (read from a screenshot, so copy it with the copy icon) |
 | Gateway role | `TradingGatewayRole` → ARN _(copy from IAM)_ |
 | Lambda | `arn:aws:lambda:us-east-1:987347315034:function:portfolio-api-handler-b4183f00` |
 | Tool schema | `s3://agent-code-bucket-b4183f00/schemas/portfolio_tools.json` |
 | Old gateway (leave it) | `trading-gateway-b4183f00-n4xfo3fdjk` (from the Challenge B identity list) |
+| **New gateway** | ID **`trading-gateway-yd7pjjawpe`**, role `TradingGatewayRole-b4183f00`, URL `https://trading-gateway-yd7pjjawpe.gateway.bedrock-agentcore.us-east-1.amazonaws.com/mcp` |
 
 ### Step 0: Collect the IDs
 
@@ -139,14 +141,25 @@ AFTER
 
 CloudShell:
 ```bash
-POOL=$(aws cognito-idp list-user-pools --max-results 50 --query "UserPools[?Name=='PartnerPool'].Id | [0]" --output text); echo $POOL
+POOL=$(aws cognito-idp list-user-pools --max-results 50 --query "UserPools[?starts_with(Name,'PartnerPool')].Id | [0]" --output text); echo $POOL
 aws cognito-idp list-user-pool-clients --user-pool-id $POOL --query "UserPoolClients[].[ClientName,ClientId]" --output table
 aws iam get-role --role-name TradingGatewayRole --query Role.Arn --output text
 ```
 
 ### Step 1: Resource server `portfolio-api` (Cognito)
 
-**UI:** Cognito → **User pools** → **PartnerPool** → left nav *Branding* → **Domain** → section **Resource servers** → **Create resource server** ⚠️
+⚡ **Fastest: CloudShell.** In this console version the Domain page shows only *Cognito domain*, *Custom domain* and *Issuer*. There's **no Resource servers section** (Mistake 1).
+
+```bash
+POOL=$(aws cognito-idp list-user-pools --max-results 50 --query "UserPools[?starts_with(Name,'PartnerPool')].Id | [0]" --output text); echo $POOL
+aws cognito-idp create-resource-server --user-pool-id $POOL --identifier portfolio-api --name portfolio-api \
+  --scopes '[{"ScopeName":"query","ScopeDescription":"Read portfolio data"},{"ScopeName":"execute","ScopeDescription":"Execute trades"}]'
+aws cognito-idp describe-resource-server --user-pool-id $POOL --identifier portfolio-api
+```
+
+**UI ✔️ confirmed 13 Nov 2026:** Cognito → **User pools** → **PartnerPool-b4183f00** → left nav ***Applications*** → **Resource servers** → **Create resource server**. It's under *Applications* with *App clients* and *MCP auth*, **not** under *Branding → Domain*.
+
+![Cognito → PartnerPool-b4183f00 → Applications → Resource servers: portfolio-api created, 2 custom scopes](assets/challenge_D/04_resource_server_created_applications_nav.png)
 
 | Field | Value |
 |---|---|
@@ -201,6 +214,19 @@ Leave the old gateway, `trading-gateway-b4183f00`, untouched.
 | Target (if the wizard includes it) | see step 4 |
 
 → **Create gateway**. Wait for **READY**, then copy the **Gateway ID** / URL.
+
+![trading-gateway created: Ready, ID trading-gateway-yd7pjjawpe, MCP URL, IAM role TradingGatewayRole-b4183f00](assets/challenge_D/05_trading_gateway_created_ready.png)
+
+**This launch:**
+- Gateway ID `trading-gateway-yd7pjjawpe`
+- URL `https://trading-gateway-yd7pjjawpe.gateway.bedrock-agentcore.us-east-1.amazonaws.com/mcp`
+- Role `TradingGatewayRole-b4183f00`
+
+Page layout, top to bottom:
+1. **Gateway details** (Edit)
+2. **View invocation code**
+3. **Inbound Auth** (Edit)
+4. Targets, further down ⚠️
 
 **CLI (workstation).** Confirm the authorizer shape first:
 ```bash
@@ -262,6 +288,10 @@ The card **requires** the console's *Machine-to-machine* type and an auto-genera
    - → **Save changes**
 8. Copy the **partner2 client ID**.
 
+![App client partner2-integration: client ID, client secret present, Login pages tab with OAuth grant types = Client credentials grant](assets/challenge_D/06_partner2_integration_created.png)
+
+The app client page has these tabs: *Quick setup guide · Attribute permissions · **Login pages** · Threat protection · Session tracking · Analytics · Client secrets*. OAuth grant types and scopes are on **Login pages** → *Managed login pages configuration* → **Edit**. "Status: Unavailable" there is normal for an M2M client with no callback URLs.
+
 ### Step 6: Add partner2 to the gateway's allowed clients
 
 **UI:** AgentCore → **Gateways** → `trading-gateway` → inbound auth / *Inbound Identity* section → **Edit** → **Allowed clients**: **keep partner1**, add partner2 → **Save** ⚠️
@@ -304,7 +334,21 @@ Then press **Check**.
 
 ## ⚠️ Mistakes & lessons
 
-_Fill in as I go. Screenshots go in `assets/challenge_D/`._
+### Mistake 1: Looked for "Resource servers" on the Domain page, but this console doesn't show it there
+
+![Cognito PartnerPool-b4183f00 → Branding → Domain: only Cognito domain, Custom domain and Issuer cards; no Resource servers section](assets/challenge_D/03_mistake_domain_page_no_resource_servers.png)
+
+- **What I saw:** PartnerPool-b4183f00 → *Branding* → **Domain** shows:
+  - **Cognito domain** `https://anycompany-partners-b4183f00.auth.us-east-1.amazoncognito.com` (Hosted UI classic)
+  - **Custom domain** (empty)
+  - **Issuer**: Original, with JWKS URL `https://cognito-idp.us-east-1.amazonaws.com/us-east-1_HXxMBvLxV/.well-known/jwks.json`
+
+  There was no **Resource servers** card.
+- **Fix:** it lives at left nav ***Applications*** → **Resource servers** (next to *App clients* and *MCP auth*). **Create resource server** works there ✅. CloudShell `create-resource-server` also works.
+- **Two side findings:**
+  - The pool is named **`PartnerPool-b4183f00`**, with a suffix. So `Name=='PartnerPool'` filters return nothing. Use `starts_with(Name,'PartnerPool')`.
+  - The **pool ID** is visible in the Issuer/JWKS URL: `us-east-1_HXxMBvLxV`.
+- **Lesson:** when a console section isn't where you expect it, switch to the CLI straight away in a timed lab. The API doesn't move around.
 
 ---
 
@@ -354,11 +398,11 @@ _Fill in as I go. Screenshots go in `assets/challenge_D/`._
 
 | Step | What I did | Result / output |
 |---|---|---|
-| 0 | IDs | _pool = ?, partner1 = ?, role ARN = ?_ |
-| 1 | Resource server | _created?_ |
+| 0 | IDs | Pool `PartnerPool-b4183f00` = `us-east-1_HXxMBvLxV` (from the Issuer URL). Domain `anycompany-partners-b4183f00`. partner1 `partner1-integration-b4183f00` = `3870k1r00ej1k1e53i6l52f2cg` (lab-created names carry the suffix; names I create follow the card exactly: `trading-gateway`, `partner2-integration`). _Role ARN = ?_ |
+| 1 | Resource server | Not on the Domain page (Mistake 1). Found under **Applications → Resource servers**. ✅ "Resource server "portfolio-api" has been created successfully", identifier `portfolio-api`, **2 custom scopes** |
 | 2 | partner1 OAuth | _saved? secret exists?_ |
-| 3 | Gateway | _ID = ?, READY?_ |
+| 3 | Gateway (console) | ✅ "Gateway trading-gateway created successfully", **Ready**. ID `trading-gateway-yd7pjjawpe`, ARN `arn:aws:bedrock-agentcore:us-east-1:987347315034:gateway/trading-gateway-yd7pjjawpe`, URL `https://trading-gateway-yd7pjjawpe.gateway.bedrock-agentcore.us-east-1.amazonaws.com/mcp`, role `TradingGatewayRole-b4183f00`, exception-level debugging Enabled. _Inbound Auth section to verify_ |
 | 4 | Target | _READY?_ |
-| 5 | partner2 | _client ID = ?_ |
+| 5 | partner2 | ✅ "App client "partner2-integration" has been updated successfully". Client ID `49m0ddismu02mbk1bcuu8bp2ft`, **client secret** present, OAuth grant types **Client credentials grant**, identity provider Cognito user pool directory. Managed login status *Unavailable*, which is normal for M2M. _Custom scopes = `portfolio-api/query` only?_ |
 | 6 | allowedClients | _[p1, p2]?_ |
 | 7 | Test / Check | _result_ |

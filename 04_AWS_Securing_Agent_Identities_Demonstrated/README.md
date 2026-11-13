@@ -223,7 +223,7 @@ From my own understanding, not verified against current AWS docs. Anything marke
 
 Open any service by typing its name in the **top search bar**, then follow the path. **Which shell for CLI work:**
 - **Workstation:** AgentCore commands only; its role can't call IAM, Lambda or CloudTrail.
-- **CloudShell** (`>_` icon in the console top bar): IAM, Lambda, CloudTrail and so on, as the console user.
+- **CloudShell** (`>_` icon in the console top bar, **or the "CloudShell" link at the bottom-left of the console footer**): IAM, Lambda, CloudTrail and so on, as the console user.
 
 | Need | Console path | CLI (where) |
 |---|---|---|
@@ -235,7 +235,7 @@ Open any service by typing its name in the **top search bar**, then follow the p
 | IAM customer managed policy | IAM → **Roles** → role → **Permissions** → policy name. Or IAM → **Policies** → filter *Customer managed* → **Edit** → **JSON** → Next → **Save changes** → **Policy versions** tab | CloudShell: `aws iam create-policy-version --set-as-default` |
 | Lambda env vars | Lambda → **Functions** → function → **Configuration** tab → **Environment variables** (left) → **Edit** → Save | CloudShell: `aws lambda update-function-configuration --environment` (replaces **all** vars) |
 | Lambda test | Lambda → function → **Test** tab → event JSON → **Test** | CloudShell: `aws lambda invoke` |
-| Cognito pools / app clients | Cognito → **User pools** → pool → **App integration** / **App clients**, **Domain**, **Resource servers** | CloudShell: `aws cognito-idp …` |
+| Cognito pools / app clients | Cognito → **User pools** → pool → left nav ***Applications*** → **App clients** / **Resource servers** ✔️ (not under Branding → Domain) / *MCP auth*. *Branding* → **Domain** = Cognito domain + Issuer (the pool ID is in the JWKS URL). App client OAuth: client → **Login pages** → **Edit** | CloudShell: `aws cognito-idp …` |
 | CloudTrail trail + data events | CloudTrail → **Trails** → **Create trail** (or the trail → **Edit**) → *Data events* → resource type | CloudShell: `aws cloudtrail put-event-selectors --advanced-event-selectors` |
 | CloudWatch log metric filter | CloudWatch → **Logs** → **Log groups** → group → **Metric filters** tab → **Create metric filter** | CloudShell: `aws logs put-metric-filter` |
 | CloudWatch alarm | CloudWatch → **Alarms** → **All alarms** → **Create alarm** → metric → conditions → **SNS topic** | CloudShell: `aws cloudwatch put-metric-alarm` |
@@ -287,7 +287,7 @@ F  Auditors ─→ Lambda reporting-backend-lambda ─(JWT, was user-ID header)�
 | B | 1 | Restrict workload identity access by using tag-based access control | Identities `Owner=risk-team` / `execution-team` (CLI only), roles `RiskTeamOperator` / `TradingTeamOperator` `Team=…`, `IdentityManagementPolicy` sid `IdentityManagementOVERLYBROAD` → Get/Update + `StringEquals bedrock-agentcore:ResourceTag/Owner = ${aws:PrincipalTag/Team}` | 🟡 In progress | [Challenge_B](Challenge_B_Workload_Identity_Owner_Tags_Role_Team_Tags_ABAC_Policy.md) |
 | C | 2 | Provision a workload identity for a self-hosted agent | `create-workload-identity compliance-audit-agent` + `Team=compliance` (workstation CLI), SSM parameter `/compliance-agent/workload-identity-arn` = ARN, Run Command `RestartComplianceAgent` → `InvokeComplianceAgent` on `compliance-agent-host` | 🟡 In progress | [Challenge_C](Challenge_C_Self_Hosted_Compliance_Agent_Workload_Identity_SSM_Parameter_Run_Command.md) |
 | D | 3 | Configure scoped JWT authorization for inbound agent access | PartnerPool resource server `portfolio-api` (`query`, `execute`), partner1 client credentials + `portfolio-api/query`, **new** gateway `trading-gateway` (TradingGatewayRole, MCP, CUSTOM_JWT clients + scopes + `token_use=access`), target `portfolio-readonly` (Lambda + S3 schema), partner2 M2M, allowedClients [p1, p2] | 🟡 In progress | [Challenge_D](Challenge_D_Scoped_JWT_Gateway_Cognito_Resource_Server_Partner_Clients.md) |
-| E | 6 | Detect identity security events by using CloudTrail and CloudWatch | Trail `identity-audit-trail` (data events) → S3 `identity-cloudtrail-…`, CloudWatch metric filters + alarms → SNS identity alerts topic | ⬜ Not started | _—_ |
+| E | 6 | Detect identity security events by using CloudTrail and CloudWatch | Trail `identity-audit-trail` (Data only, `AWS::BedrockAgentCore::WorkloadIdentity` log all, no KMS) → S3 `identity-cloudtrail-b4183f00`; alarm `IdentityAuthFailures-Operational` (`WorkloadAccessTokenFetchFailures`, no dims, Sum 5 min > 5); filter `RestrictedAccountAccess` (`RESTRICTED_ACCOUNT_X99` → `AgentCoreSecurity/RestrictedAccountAccessAttempts` 1/0); alarm `RestrictedAccountAccess-Alert` (>= 1) → SNS `IdentityAlertsTopic` | 🟡 In progress | [Challenge_E](Challenge_E_CloudTrail_WorkloadIdentity_Data_Events_CloudWatch_Alarms_Metric_Filter.md) |
 | F | 5 | Migrate the regulatory reporting agent to JWT-based identity verification | Reporting agent inbound → Custom JWT, `reporting-backend-lambda` sends a Bearer token instead of a user-ID header | ⬜ Not started | _—_ |
 
 _Letters come from the diagram labels. I'll confirm each row when I post its task card._
