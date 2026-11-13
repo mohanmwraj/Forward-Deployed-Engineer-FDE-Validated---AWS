@@ -109,7 +109,7 @@ AFTER
 | Runtime ARN | `arn:aws:bedrock-agentcore:us-east-1:987347315034:runtime/client_advisor_runtime_b4183f00-jD0mCRBx4b` |
 | Code | bucket `agent-code-bucket-b4183f00`, prefix `agent_code/client_advisor_agent.zip` |
 | Role | `arn:aws:iam::987347315034:role/ClientAdvisorRuntimeRole-b4183f00` |
-| Expected endpoint ARN ⚠️ | `…:runtime/client_advisor_runtime_b4183f00-jD0mCRBx4b/runtime-endpoint/internal_rebalance` (copy the real one from step 3) |
+| Endpoint ARN (format confirmed from `advisor_portal`) | `arn:aws:bedrock-agentcore:us-east-1:987347315034:runtime/client_advisor_runtime_b4183f00-jD0mCRBx4b/runtime-endpoint/internal_rebalance` |
 
 ### Step 1: Read version 1 (workstation)
 
@@ -117,10 +117,12 @@ EC2 console → instance `i-019262426d5ae9111` → **Connect** → **Session Man
 
 ```bash
 sudo su - ec2-user
+# ↓ run these AFTER the shell switches to ec2-user, one line at a time
 export AWS_DEFAULT_REGION=us-east-1
-RID=client_advisor_runtime_b4183f00-jD0mCRBx4b
-aws bedrock-agentcore-control get-agent-runtime --agent-runtime-id $RID > v1.json; cat v1.json
-aws bedrock-agentcore-control list-agent-runtime-endpoints --agent-runtime-id $RID
+export RID=client_advisor_runtime_b4183f00-jD0mCRBx4b
+echo "RID=$RID"     # must print the ID, not an empty value
+aws bedrock-agentcore-control get-agent-runtime --agent-runtime-id "$RID" > v1.json; cat v1.json
+aws bedrock-agentcore-control list-agent-runtime-endpoints --agent-runtime-id "$RID"
 ```
 
 Look for:
@@ -130,26 +132,55 @@ Look for:
 - **`environmentVariables`**: if any are present, they must be passed again in step 2
 - `authorizerConfiguration.customJWTAuthorizer`, which is what v2 must **not** have
 
+### What version 1 actually looked like (`get-agent-runtime`, 13 Nov 2026)
+
+![get-agent-runtime output for client_advisor_runtime_b4183f00 version 1](assets/challenge_A/06_v1_get_agent_runtime.png)
+
+| Field | v1 value | v2 should be |
+|---|---|---|
+| `agentRuntimeArtifact.codeConfiguration` | S3 `agent-code-bucket-b4183f00` / `agent_code/client_advisor_agent.zip`, `PYTHON_3_11`, `["main.py"]` | same |
+| `roleArn` | `…:role/ClientAdvisorRuntimeRole-b4183f00` | same |
+| `networkConfiguration` | `PUBLIC` | same |
+| `protocolConfiguration` | *(not shown, default)* | `HTTP` (set explicitly) |
+| **`environmentVariables`** | `MODEL_ID=amazon.nova-pro-v1:0`, `WORKLOAD_IDENTITY_NAME=client_advisor_runtime_b4183f00` | same (would be **lost** if left out) |
+| **`lifecycleConfiguration`** | `idleRuntimeSessionTimeout: 900`, `maxLifetime: 28800` | same |
+| **`metadataConfiguration`** | IMDSv2 required: `true` | same |
+| `authorizerConfiguration` | `customJWTAuthorizer`: discovery URL for pool `us-east-1_sunFt1Ujs` (ClientServicesPool), one allowed client | **absent** (SigV4) |
+| `workloadIdentityDetails` | `…:workload-identity-directory/default/workload-identity/client_advisor_runtime_b4183f00-jD0mCRBx4b` | (read-only, auto-created by the Runtime) |
+| `platformVersion` | `V1` | (read-only) |
+
+Two findings from this output:
+- The Runtime **auto-created a workload identity** named after the runtime ID. Useful context for Challenges B and C.
+- The endpoint list shows `advisor_portal` → v1 and `DEFAULT` → v1. The endpoint ARN format is confirmed as `…:runtime/<runtimeId>/runtime-endpoint/<name>`.
+
 ### Step 2: Publish a version without an authorizer
 
-`update-agent-runtime` replaces the whole configuration. Every setting must be passed again, and **leaving out `--authorizer-configuration`** gives a SigV4 version.
+`update-agent-runtime` **replaces the whole configuration**. Anything left out is dropped, which here would include the env vars, lifecycle and metadata settings. So build the request **from v1.json**: copy everything, drop only `authorizerConfiguration`, and set protocol `HTTP`. The CLI skeleton filters out read-only keys the update doesn't accept.
 
 ```bash
-aws bedrock-agentcore-control update-agent-runtime \
-  --agent-runtime-id $RID \
-  --agent-runtime-artifact '{"codeConfiguration":{"code":{"s3":{"bucket":"agent-code-bucket-b4183f00","prefix":"agent_code/client_advisor_agent.zip"}},"runtime":"PYTHON_3_11","entryPoint":["main.py"]}}' \
-  --role-arn arn:aws:iam::987347315034:role/ClientAdvisorRuntimeRole-b4183f00 \
-  --network-configuration '{"networkMode":"PUBLIC"}' \
-  --protocol-configuration '{"serverProtocol":"HTTP"}'
-  # + --environment-variables '{...}'   only if v1.json had environmentVariables (copy them exactly)
+aws bedrock-agentcore-control update-agent-runtime --generate-cli-skeleton input > skel.json
+python3 - <<'EOF'
+import json
+v1 = json.load(open('v1.json')); allowed = set(json.load(open('skel.json')))
+keep = ['agentRuntimeArtifact','roleArn','networkConfiguration','environmentVariables',
+        'lifecycleConfiguration','metadataConfiguration','requestHeaderConfiguration']
+req = {'agentRuntimeId': v1['agentRuntimeId']}
+req.update({k: v1[k] for k in keep if k in v1 and k in allowed})
+if 'protocolConfiguration' in allowed: req['protocolConfiguration'] = {'serverProtocol': 'HTTP'}
+req['description'] = 'Client advisor Runtime - SigV4 (IAM) inbound auth for internal rebalance callers'
+json.dump(req, open('update.json','w'), indent=2)
+print(json.dumps(req, indent=2)); print('NOT copied:', [k for k in v1 if k not in req])
+EOF
+# check the printout: NO authorizerConfiguration; env vars + lifecycle + artifact present
+aws bedrock-agentcore-control update-agent-runtime --cli-input-json file://update.json
 ```
 
 Wait for **READY**, and confirm the new version has no authorizer:
 
 ```bash
-aws bedrock-agentcore-control get-agent-runtime --agent-runtime-id $RID \
-  --query "[status,agentRuntimeVersion,authorizerConfiguration]"
-# expect: ["READY", "2", null]
+aws bedrock-agentcore-control get-agent-runtime --agent-runtime-id "$RID" \
+  --query "[status,agentRuntimeVersion,authorizerConfiguration,environmentVariables]"
+# expect: ["READY", "2", null, {MODEL_ID…, WORKLOAD_IDENTITY_NAME…}]
 ```
 
 **Console alternative ⚠️:** AgentCore → **Agents** → `client_advisor_runtime…` → **Edit / Update** → Inbound auth = **IAM permissions** (not JWT) → keep everything else → Save. The code source must stay the **existing S3 location**. "Upload" fails with `s3:PutObject` denied (Lab 03 D).
@@ -193,6 +224,19 @@ IAM → **Roles** → `rebalance-handler-role` → **Permissions** → `InvokeRu
 
 → **Next** → **Save changes**. Then open the **Policy versions** tab: the new version should be **(Default)**. If Save fails on the **5-version** limit, delete an old non-default version first.
 
+**What the real policy looked like:** four statements:
+
+| Sid | Effect | Action | Resource |
+|---|---|---|---|
+| `ListRuntimes` | Allow | `bedrock-agentcore:ListAgentRuntimes` | `*` |
+| `InvokeRuntimePolicy` | Allow | `bedrock-agentcore:InvokeAgentRuntime` | `*` |
+| _(none)_ | Deny | `*` | the lab's `gbl_lab_monitoring` Lambda, its role and its EventBridge rules |
+| _(none)_ | Deny | `lambda:PutProvisionedConcurrencyConfig` | `*` |
+
+Only the `InvokeRuntimePolicy` statement's `Resource` changes: from `"*"` to the 2-ARN list above. Leave everything else as it is:
+- `ListRuntimes` stays `*`, because List actions have no resource-level scope.
+- **Keep both Deny statements.** They're lab guardrails.
+
 **Why both ARNs:** invoking with an endpoint qualifier is authorized against the **runtime** and the **endpoint** resource. If either is missing, the call gets `AccessDenied`.
 
 ### Step 6: Test (optional) and Check
@@ -210,7 +254,55 @@ Lambda → `rebalance-handler` → **Test** → event `{"client_id": "CL-WEB-001
 
 ## ⚠️ Mistakes & lessons
 
-_Fill in as I go. Screenshots go in `assets/challenge_A/`._
+### Mistake 1: Connected with the EC2 Instance Connect tab instead of Session Manager
+
+![Failed to connect to your instance: SendSSHPublicKey failed. Try again later.](assets/challenge_A/03_mistake_ec2_instance_connect_sendsshpublickey.png)
+
+```text
+Failed to connect to your instance
+SendSSHPublicKey failed. Try again later.
+```
+
+- **What happened:** EC2 → instance → **Connect** opens on the **EC2 Instance Connect** tab by default. I pressed Connect there.
+- **Why it fails:** Instance Connect pushes a temporary SSH key with `ec2-instance-connect:SendSSHPublicKey`. The lab user has no permission for that, and the instance may not accept SSH at all. The lab says to use **Session Manager**, which needs no SSH, no open port 22 and no key. It goes through the SSM agent on the instance.
+- **Fix:** in this console version, the instance page's **Connect ↗** button opens the default method (Instance Connect) directly, and there's **no tab picker**. Use the **▾ arrow next to Connect** → **Session Manager**.
+  - Or: Systems Manager → **Session Manager** → **Start session** → pick `workstation-b4183f00` → Start session.
+  - Or: Systems Manager → **Fleet Manager** / **Explore nodes** → the instance → **Node actions** → **Connect** → **Start terminal session**.
+  - If the instance isn't listed, wait 1–2 minutes for the SSM agent to register, then refresh.
+
+![EC2 instance summary for workstation-b4183f00: Connect button with external-link icon and a separate dropdown arrow; IAM role LearnerInstanceRole-b4183f00; subnet ComplianceAgentVpc/PublicSubnet1](assets/challenge_A/04_ec2_instance_summary_connect_dropdown.png)
+
+- **Seen on the instance page:** name `workstation-b4183f00`, role **`LearnerInstanceRole-b4183f00`**, subnet `CdkLab…/ComplianceAgentVpc/PublicSubnet1`, AL2023, IMDSv2 required. The VPC name suggests the workstation may also be the compliance agent host for Challenge C ⚠️.
+- **Lesson:** "SendSSHPublicKey" in an error means *EC2 Instance Connect*, not Session Manager. When the panel says Session Manager, check the **tab** before pressing Connect.
+
+### Mistake 2: `$RID` was empty, so every command failed with "expected one argument"
+
+![aws: [ERROR]: An error occurred (ParamValidation): argument --agent-runtime-id: expected one argument, repeated for get-agent-runtime, list-agent-runtime-endpoints and update-agent-runtime](assets/challenge_A/05_mistake_rid_empty_expected_one_argument.png)
+
+```text
+aws: [ERROR]: An error occurred (ParamValidation): argument --agent-runtime-id: expected one argument
+```
+
+- **What happened:** `get-agent-runtime`, `list-agent-runtime-endpoints` and `update-agent-runtime` all failed at argument parsing. **Nothing changed** on the runtime.
+- **Why:** `RID` was unset in the `ec2-user` shell, so `--agent-runtime-id $RID` expanded to nothing. `sudo su - ec2-user` starts a **new login shell**, so a variable set before it, or in the same multi-line paste, is lost.
+- **Fix:** in the `ec2-user` shell, run `export RID=client_advisor_runtime_b4183f00-jD0mCRBx4b`, then check it with `echo "RID=$RID"`. Quote it (`"$RID"`) in commands. Or type the literal ID.
+- **Lesson:** after `sudo su -`, **set variables again and `echo` them** before using them.
+
+### Mistake 3: Ran the generic update before reading v1, so version 2 lost the env vars, lifecycle and metadata
+
+```text
+update-agent-runtime (artifact + role + network + protocol only) → agentRuntimeVersion "2", status UPDATING
+get-agent-runtime → ["READY", "2", null]      ← authorizer gone ✅, but environmentVariables / lifecycle / IMDSv2 not passed ❌
+```
+
+- **What happened:** I ran the hand-built update from the first draft of step 2, which listed only the criteria fields. v1 also had `environmentVariables` (`MODEL_ID`, `WORKLOAD_IDENTITY_NAME`), `lifecycleConfiguration` and `metadataConfiguration`.
+- **Why it matters:** `update-agent-runtime` is a **full replace**, so whatever isn't passed is dropped. Without `MODEL_ID`, the agent likely can't call its model, so the Lambda test fails. It's also not "preserving existing settings".
+- **Fix:** publish **v3** from `v1.json` (the step 2 script). By then `internal_rebalance` had already been created on v2, so **repoint it** once it's READY:
+  ```bash
+  aws bedrock-agentcore-control update-agent-runtime-endpoint --agent-runtime-id "$RID" --endpoint-name internal_rebalance --agent-runtime-version 3
+  ```
+  The **endpoint ARN doesn't change** when it's repointed, so the Lambda env var and the IAM policy need no rework. v2 stays as an unused version, which does no harm. Once v3 exists, "pinned to the new version" means v3.
+- **Lesson:** for any "update"-style API that replaces the whole config, **read the current config first**, then build the request from it and change only what you mean to change. Paste one line at a time in Session Manager. Also, read the config (`v1.json`) **before** running the update command. I ran them all in one go.
 
 ---
 
@@ -218,12 +310,16 @@ _Fill in as I go. Screenshots go in `assets/challenge_A/`._
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
+| Connect → `SendSSHPublicKey failed. Try again later.` | Used the **EC2 Instance Connect** tab | Use the **Session Manager** tab (Mistake 1) |
+| `argument --agent-runtime-id: expected one argument` | `$RID` is empty (set before `sudo su -`) | `export RID=…` in the current shell, `echo` it, quote `"$RID"` (Mistake 2) |
 | `update-agent-runtime` → `ValidationException` about a missing field | Update is a full replace | Pass artifact, role, network and protocol again (step 2) |
-| New version is missing env vars or the agent errors | `--environment-variables` left out | Update again, this time with v1's env vars |
+| New version is missing env vars, lifecycle or IMDSv2 settings | Hand-built update left them out | Build `update.json` from `v1.json` (step 2) and update again |
+| `Unknown parameter in input: "…"` | That key isn't accepted by this CLI's `update-agent-runtime` | The skeleton filter should prevent this. Otherwise delete that key from `update.json` and run again |
 | `get-agent-runtime` still shows `customJWTAuthorizer` | Looked at v1, or the update didn't apply | Check `agentRuntimeVersion` in the output, then re-run step 2 |
 | Lambda test → 401 / "authorization method mismatch" | `RUNTIME_ENDPOINT` still `advisor_portal`, or the endpoint points at v1 | Step 4, and `list-agent-runtime-endpoints` |
 | Lambda test → `AccessDenied … InvokeAgentRuntime` | Policy is missing the endpoint ARN, or the ARN has a typo | Paste the exact `agentRuntimeEndpointArn` from step 3 |
-| Endpoint shows CREATING / UPDATING | Still provisioning | Wait for READY before testing |
+| Endpoint shows CREATING / UPDATING | Still provisioning | Wait for READY before testing or repointing |
+| Endpoint pinned to a version that's missing settings | Created on the wrong version | `update-agent-runtime-endpoint --endpoint-name … --agent-runtime-version <good>`. The ARN stays the same |
 | Check fails on the policy criterion | Extra resources left, or the new version isn't the default | Exactly 2 ARNs. Policy versions tab → new version = Default |
 | `advisor_portal` moved to v2 | It was edited by mistake | `update-agent-runtime-endpoint --name advisor_portal --agent-runtime-version 1` |
 
@@ -262,9 +358,13 @@ _Fill in as I go. Screenshots go in `assets/challenge_A/`._
 
 | Step | What I did | Result / output |
 |---|---|---|
-| 1 | v1 config + endpoints | _env vars? endpoints = ?_ |
-| 2 | update-agent-runtime | _new version = ?, READY?, authorizer null?_ |
-| 3 | internal_rebalance | _endpoint ARN = ?_ |
+| 1 | EC2 → Connect (default tab) | ❌ `SendSSHPublicKey failed`: that was the EC2 Instance Connect tab. Use the **Session Manager** tab (Mistake 1) |
+| 1 | First CLI run | ❌ `--agent-runtime-id: expected one argument` on all 4 commands. `$RID` was empty after `sudo su -` (Mistake 2). Nothing changed |
+| 1 | v1 config + endpoints | ✅ v1 READY, JWT authorizer (pool `us-east-1_sunFt1Ujs`). **Env vars** `MODEL_ID`, `WORKLOAD_IDENTITY_NAME` + lifecycle 900/28800 + IMDSv2, so step 2 builds the update from v1.json. Endpoints: `advisor_portal` → v1, `DEFAULT` → v1 |
+| 2 | update-agent-runtime (generic command) | v2 READY, authorizer `null` ✅, but env vars, lifecycle and metadata not passed ❌ (Mistake 3) |
+| 2b | update from `v1.json` (script) → v3 | _v3 READY? env vars present?_ |
+| 3 | create internal_rebalance (on **v2**) | CREATING, `targetVersion: 2`. ARN `…/runtime-endpoint/internal_rebalance`. `advisor_portal` still v1 ✅, `DEFAULT` → v2 |
+| 3b | update-agent-runtime-endpoint → **v3** | _liveVersion 3? READY?_ |
 | 4 | Lambda RUNTIME_ENDPOINT | _saved?_ |
-| 5 | InvokeRuntimePolicy | _new default version = v?_ |
+| 5 | InvokeRuntimePolicy | Policy had 4 statements (ListRuntimes, InvokeRuntimePolicy `*`, 2 lab Denies). Changed only the InvokeRuntimePolicy Resource to runtime + `internal_rebalance` ARNs. _New default version = v?_ |
 | 6 | Lambda test / Check | _result_ |

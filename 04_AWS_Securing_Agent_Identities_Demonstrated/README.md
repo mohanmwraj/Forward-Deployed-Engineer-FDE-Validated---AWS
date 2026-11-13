@@ -218,6 +218,28 @@ From my own understanding, not verified against current AWS docs. Anything marke
 | **IAM policy simulator** | IAM → Policies → policy → **Simulate**, with the agent's role and a resource ARN | Whether a tag condition allows or denies, without calling the API |
 | **Workstation (EC2 + SSM)** | EC2 → `i-019262426d5ae9111` → **Connect** → **Session Manager** → Connect. Start with `sudo su - ec2-user` ⚠️, `ls ~`, `aws sts get-caller-identity` | What's on the box (agent code, scripts, README), and which role the CLI runs as |
 | **AgentCore CLI checks** | `aws bedrock-agentcore-control list-workload-identities` · `get-agent-runtime --agent-runtime-id …` · `get-gateway --gateway-identifier …` | Identities and tags, and each runtime's or gateway's `authorizerConfiguration` |
+
+### 🧭 Console quick-nav (where things are, so I don't waste time searching)
+
+Open any service by typing its name in the **top search bar**, then follow the path. **Which shell for CLI work:**
+- **Workstation:** AgentCore commands only; its role can't call IAM, Lambda or CloudTrail.
+- **CloudShell** (`>_` icon in the console top bar): IAM, Lambda, CloudTrail and so on, as the console user.
+
+| Need | Console path | CLI (where) |
+|---|---|---|
+| Workstation terminal | EC2 → **Instances** → `workstation-b4183f00` → **Connect ▾** (the arrow, not *Connect ↗*) → **Session Manager** → Connect. Or Systems Manager → **Session Manager** → **Start session**. Then `sudo su - ec2-user` | — |
+| AgentCore runtimes ("agents") | Bedrock AgentCore → **Agents** (there's no "Runtime" item) → agent → versions / **Endpoints** | Workstation: `get-agent-runtime`, `list-agent-runtime-endpoints` |
+| AgentCore gateways | Bedrock AgentCore → *Resources* → **Gateways** → gateway → inbound auth / **Targets** | Workstation: `list-gateways`, `get-gateway` |
+| Workload identities | **Not in the console** | Workstation: `list-workload-identities`, `tag-resource`, `list-tags-for-resource` |
+| IAM role tags | IAM → **Roles** → search → role → **Tags** tab → **Manage tags** | CloudShell: `aws iam tag-role` |
+| IAM customer managed policy | IAM → **Roles** → role → **Permissions** → policy name. Or IAM → **Policies** → filter *Customer managed* → **Edit** → **JSON** → Next → **Save changes** → **Policy versions** tab | CloudShell: `aws iam create-policy-version --set-as-default` |
+| Lambda env vars | Lambda → **Functions** → function → **Configuration** tab → **Environment variables** (left) → **Edit** → Save | CloudShell: `aws lambda update-function-configuration --environment` (replaces **all** vars) |
+| Lambda test | Lambda → function → **Test** tab → event JSON → **Test** | CloudShell: `aws lambda invoke` |
+| Cognito pools / app clients | Cognito → **User pools** → pool → **App integration** / **App clients**, **Domain**, **Resource servers** | CloudShell: `aws cognito-idp …` |
+| CloudTrail trail + data events | CloudTrail → **Trails** → **Create trail** (or the trail → **Edit**) → *Data events* → resource type | CloudShell: `aws cloudtrail put-event-selectors --advanced-event-selectors` |
+| CloudWatch log metric filter | CloudWatch → **Logs** → **Log groups** → group → **Metric filters** tab → **Create metric filter** | CloudShell: `aws logs put-metric-filter` |
+| CloudWatch alarm | CloudWatch → **Alarms** → **All alarms** → **Create alarm** → metric → conditions → **SNS topic** | CloudShell: `aws cloudwatch put-metric-alarm` |
+| SNS topic | SNS → **Topics** → topic (ARN for alarm actions) | CloudShell: `aws sns list-topics` |
 | **CloudTrail** | CloudTrail → **Event history** (management events), or the trail's log group | Who called which token API, and the `errorCode` |
 | **CloudWatch** | Log group → **Metric filters** → test pattern; **Alarms** | Whether the filter matches real events and the alarm fires |
 
@@ -262,7 +284,7 @@ F  Auditors ─→ Lambda reporting-backend-lambda ─(JWT, was user-ID header)�
 | # | Obj | Challenge | Key services | Status | File |
 |---|---|---|---|---|---|
 | A | 4 | Configure a SigV4 path for the rebalancing service | `client_advisor_runtime` **new version without an authorizer** (same S3 code/settings), endpoint `internal_rebalance` → it, `advisor_portal` stays v1, Lambda `RUNTIME_ENDPOINT`, `InvokeRuntimePolicy` → runtime + endpoint ARNs (new default version) | 🟡 In progress | [Challenge_A](Challenge_A_SigV4_Path_Runtime_Version_Named_Endpoint_Scoped_Invoke_Policy.md) |
-| B | 1 | Restrict workload identity access by using tag-based access control | Workload identity tags (risk / trading), team-role policies **new version** with `aws:ResourceTag` condition | ⬜ Not started | _—_ |
+| B | 1 | Restrict workload identity access by using tag-based access control | Identities `Owner=risk-team` / `execution-team` (CLI only), roles `RiskTeamOperator` / `TradingTeamOperator` `Team=…`, `IdentityManagementPolicy` sid `IdentityManagementOVERLYBROAD` → Get/Update + `StringEquals bedrock-agentcore:ResourceTag/Owner = ${aws:PrincipalTag/Team}` | 🟡 In progress | [Challenge_B](Challenge_B_Workload_Identity_Owner_Tags_Role_Team_Tags_ABAC_Policy.md) |
 | C | 2 | Provision a workload identity for a self-hosted agent | AgentCore Identity (compliance audit agent), EC2 `compliance-agent-host` via Session Manager | ⬜ Not started | _—_ |
 | D | 3 | Configure scoped JWT authorization for inbound agent access | Trading **Gateway** Custom JWT (Partner pool, clients + scopes), `portfolio-api-handler` target + `portfolio_tools.json` | ⬜ Not started | _—_ |
 | E | 6 | Detect identity security events by using CloudTrail and CloudWatch | Trail `identity-audit-trail` (data events) → S3 `identity-cloudtrail-…`, CloudWatch metric filters + alarms → SNS identity alerts topic | ⬜ Not started | _—_ |
