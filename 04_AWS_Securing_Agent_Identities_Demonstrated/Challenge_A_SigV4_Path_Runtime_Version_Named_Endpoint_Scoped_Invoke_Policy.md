@@ -121,9 +121,11 @@ sudo su - ec2-user
 export AWS_DEFAULT_REGION=us-east-1
 export RID=client_advisor_runtime_b4183f00-jD0mCRBx4b
 echo "RID=$RID"     # must print the ID, not an empty value
-aws bedrock-agentcore-control get-agent-runtime --agent-runtime-id "$RID" > v1.json; cat v1.json
+aws bedrock-agentcore-control get-agent-runtime --agent-runtime-id "$RID" --agent-runtime-version 1 > v1.json; cat v1.json
 aws bedrock-agentcore-control list-agent-runtime-endpoints --agent-runtime-id "$RID"
 ```
+
+Always pass `--agent-runtime-version 1`. Without it, the command returns the **latest** version, which after an update is no longer v1 (Mistake 4).
 
 Look for:
 - `agentRuntimeArtifact.codeConfiguration` (bucket, prefix, `PYTHON_3_11`, `main.py`)
@@ -302,7 +304,21 @@ get-agent-runtime → ["READY", "2", null]      ← authorizer gone ✅, but env
   aws bedrock-agentcore-control update-agent-runtime-endpoint --agent-runtime-id "$RID" --endpoint-name internal_rebalance --agent-runtime-version 3
   ```
   The **endpoint ARN doesn't change** when it's repointed, so the Lambda env var and the IAM policy need no rework. v2 stays as an unused version, which does no harm. Once v3 exists, "pinned to the new version" means v3.
-- **Lesson:** for any "update"-style API that replaces the whole config, **read the current config first**, then build the request from it and change only what you mean to change. Paste one line at a time in Session Manager. Also, read the config (`v1.json`) **before** running the update command. I ran them all in one go.
+- **Lesson:** for any "update"-style API that replaces the whole config, **read the current config first**, then build the request from it and change only what you mean to change.
+
+### Mistake 4: `v1.json` was overwritten with the latest version, so v3 also lacked the env vars
+
+```text
+NOT copied: ['agentRuntimeArn', 'agentRuntimeName', 'agentRuntimeVersion', 'createdAt', 'lastUpdatedAt',
+             'status', 'workloadIdentityDetails', 'platformVersion']
+   ← no 'environmentVariables' and no 'authorizerConfiguration' → the file was NOT version 1
+get-agent-runtime → ["READY", "3", null, null]     ← env vars still missing
+```
+
+- **Why:** `get-agent-runtime … > v1.json` was run again **after** v2 existed. Without `--agent-runtime-version`, it returns the **latest** version (v2), and v2 had no env vars or authorizer. `lifecycleConfiguration` and `metadataConfiguration` still appeared, because they have service defaults.
+- **How to spot it:** if the `NOT copied` list has **no `authorizerConfiguration`**, the source file isn't v1, because v1 is the JWT version.
+- **Fix:** `get-agent-runtime --agent-runtime-id "$RID" --agent-runtime-version 1 > v1.json`. Check with `grep` that it has `environmentVariables` **and** `customJWTAuthorizer`. Re-run the script, which creates **v4**, then `update-agent-runtime-endpoint … internal_rebalance --agent-runtime-version 4`.
+- **Lesson:** when reading a versioned resource, **always pass the version**. And don't overwrite your baseline snapshot: give each snapshot its own file name (`v1.json`, `latest.json`). Paste one line at a time in Session Manager. Also, read the config (`v1.json`) **before** running the update command. I ran them all in one go.
 
 ---
 
@@ -362,9 +378,64 @@ get-agent-runtime → ["READY", "2", null]      ← authorizer gone ✅, but env
 | 1 | First CLI run | ❌ `--agent-runtime-id: expected one argument` on all 4 commands. `$RID` was empty after `sudo su -` (Mistake 2). Nothing changed |
 | 1 | v1 config + endpoints | ✅ v1 READY, JWT authorizer (pool `us-east-1_sunFt1Ujs`). **Env vars** `MODEL_ID`, `WORKLOAD_IDENTITY_NAME` + lifecycle 900/28800 + IMDSv2, so step 2 builds the update from v1.json. Endpoints: `advisor_portal` → v1, `DEFAULT` → v1 |
 | 2 | update-agent-runtime (generic command) | v2 READY, authorizer `null` ✅, but env vars, lifecycle and metadata not passed ❌ (Mistake 3) |
-| 2b | update from `v1.json` (script) → v3 | _v3 READY? env vars present?_ |
+| 2b | update from `v1.json` (script) → v3 | v3 READY, authorizer `null`, but env vars `null` ❌. `v1.json` held v2, not v1 (Mistake 4) |
+| 2c | `get-agent-runtime --agent-runtime-version 1 > v1.json` → script | ✅ grep shows env vars + `customJWTAuthorizer` (pool `us-east-1_sunFt1Ujz`, client `7qum4kkicv1m1nimess8j9eqq2`). `update.json` has env vars, lifecycle, metadata, HTTP. `NOT copied` includes `authorizerConfiguration` |
+| 2d | update → v4 | ✅ `agentRuntimeVersion: "4"`. First poll `["UPDATING","4",null,{MODEL_ID, WORKLOAD_IDENTITY_NAME}]`: no authorizer **and** env vars kept. `DEFAULT` → v4 READY |
 | 3 | create internal_rebalance (on **v2**) | CREATING, `targetVersion: 2`. ARN `…/runtime-endpoint/internal_rebalance`. `advisor_portal` still v1 ✅, `DEFAULT` → v2 |
-| 3b | update-agent-runtime-endpoint → **v3** | _liveVersion 3? READY?_ |
+| 3b | update-agent-runtime-endpoint → **v4** | `internal_rebalance` live **2** → target **4**, UPDATING. `advisor_portal` live **1** READY ✅. `DEFAULT` live 4 READY. _Waiting for internal_rebalance live 4 READY_ |
 | 4 | Lambda RUNTIME_ENDPOINT | _saved?_ |
 | 5 | InvokeRuntimePolicy | Policy had 4 statements (ListRuntimes, InvokeRuntimePolicy `*`, 2 lab Denies). Changed only the InvokeRuntimePolicy Resource to runtime + `internal_rebalance` ARNs. _New default version = v?_ |
 | 6 | Lambda test / Check | _result_ |
+
+### Raw output: v4 publish + endpoint repoint (13 Nov 2026, ~12:31 UTC)
+
+```text
+[ec2-user@ip-10-0-0-12 ~]$ aws bedrock-agentcore-control update-agent-runtime --cli-input-json file://update.json
+{
+    "agentRuntimeArn": "arn:aws:bedrock-agentcore:us-east-1:987347315034:runtime/client_advisor_runtime_b4183f00-jD0mCRBx4b",
+    "agentRuntimeId": "client_advisor_runtime_b4183f00-jD0mCRBx4b",
+    "workloadIdentityDetails": {
+        "workloadIdentityArn": "arn:aws:bedrock-agentcore:us-east-1:987347315034:workload-identity-directory/default/workload-identity/client_advisor_runtime_b4183f00-jD0mCRBx4b"
+    },
+    "agentRuntimeVersion": "4",
+    "createdAt": "2026-11-13T11:55:01.305764+00:00",
+    "lastUpdatedAt": "2026-11-13T12:31:49.989479+00:00",
+    "status": "UPDATING"
+}
+
+[ec2-user@ip-10-0-0-12 ~]$ aws bedrock-agentcore-control get-agent-runtime --agent-runtime-id "$RID" --query "[status,agentRuntimeVersion,authorizerConfiguration,environmentVariables]"
+[
+    "UPDATING",
+    "4",
+    null,
+    {
+        "MODEL_ID": "amazon.nova-pro-v1:0",
+        "WORKLOAD_IDENTITY_NAME": "client_advisor_runtime_b4183f00"
+    }
+]
+
+[ec2-user@ip-10-0-0-12 ~]$ aws bedrock-agentcore-control update-agent-runtime-endpoint --agent-runtime-id "$RID" --endpoint-name internal_rebalance --agent-runtime-version 4
+{
+    "liveVersion": "2",
+    "targetVersion": "4",
+    "agentRuntimeEndpointArn": "arn:aws:bedrock-agentcore:us-east-1:987347315034:runtime/client_advisor_runtime_b4183f00-jD0mCRBx4b/runtime-endpoint/internal_rebalance",
+    "agentRuntimeArn": "arn:aws:bedrock-agentcore:us-east-1:987347315034:runtime/client_advisor_runtime_b4183f00-jD0mCRBx4b",
+    "status": "UPDATING",
+    "createdAt": "2026-11-13T12:17:48.777113+00:00",
+    "lastUpdatedAt": "2026-11-13T12:31:58.920315+00:00"
+}
+
+[ec2-user@ip-10-0-0-12 ~]$ aws bedrock-agentcore-control list-agent-runtime-endpoints --agent-runtime-id "$RID" --query "runtimeEndpoints[].[name,liveVersion,targetVersion,status]" --output table
+-------------------------------------------------
+|           ListAgentRuntimeEndpoints           |
++---------------------+----+-------+------------+
+|  internal_rebalance |  2 |  4    |  UPDATING  |
+|  advisor_portal     |  1 |  None |  READY     |
+|  DEFAULT            |  4 |  None |  READY     |
++---------------------+----+-------+------------+
+```
+
+**Reading it:**
+- **`liveVersion` vs `targetVersion`:** while an endpoint is UPDATING, it keeps serving `liveVersion` (2) and switches to `targetVersion` (4) when it reaches READY. After that, `targetVersion` goes back to `None`.
+- **Same ARN:** the `internal_rebalance` ARN didn't change, so the Lambda env var and the IAM policy are still valid.
+- **`DEFAULT`** moved to v4 on its own. **`advisor_portal`** stayed on v1, which is what the criterion needs.

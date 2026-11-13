@@ -170,6 +170,26 @@ aws iam list-role-tags --role-name TradingTeamOperator
    }
    ```
 
+   **What the real policy looked like:** three statements:
+
+   | Sid | Effect | Action | Resource |
+   |---|---|---|---|
+   | `IdentityManagementOVERLYBROAD` | Allow | `GetWorkloadIdentity`, `UpdateWorkloadIdentity` | `*`, **no condition** |
+   | _(none)_ | Deny | `*` | the lab monitoring Lambda, its role and its EventBridge rules |
+   | _(none)_ | Deny | `lambda:PutProvisionedConcurrencyConfig` | `*` |
+
+   The fix **adds only a `Condition`** to the first statement. Its sid, both actions, `Resource: "*"` and both Deny statements stay exactly as they were. The final first statement:
+
+   ```json
+   {
+     "Action": ["bedrock-agentcore:GetWorkloadIdentity", "bedrock-agentcore:UpdateWorkloadIdentity"],
+     "Resource": "*",
+     "Effect": "Allow",
+     "Sid": "IdentityManagementOVERLYBROAD",
+     "Condition": { "StringEquals": { "bedrock-agentcore:ResourceTag/Owner": "${aws:PrincipalTag/Team}" } }
+   }
+   ```
+
 4. Ignore **"Invalid Service Condition Key"**. The validator doesn't know this key yet, as the card says. Then **Next** → **Save changes**.
 5. **Policy versions** tab → the new version should be **(Default)**. The policy is attached to both roles, so one edit covers both.
 
@@ -260,8 +280,51 @@ _Fill in as I go. Screenshots go in `assets/challenge_B/`._
 
 | Step | What I did | Result / output |
 |---|---|---|
-| 2 | list-workload-identities | _risk ARN = ?, trading ARN = ?_ |
-| 2 | tag-resource ×2 | _list-tags-for-resource shows Owner?_ |
+| 2 | list-workload-identities | ✅ 7 identities (below). Risk = `…/workload-identity/risk_assessment_runtime_b4183f00-icCH7oBUFo`, trading = `…/workload-identity/trading_execution_runtime_b4183f00-EuAcruGnOa` |
+| 2 | tag-resource ×2 | ✅ `list-tags-for-resource`: risk `Owner=risk-team`, trading `Owner=execution-team` (plus the CloudFormation `aws:cloudformation:*` tags already there) |
 | 3 | Role tags | _Team tags saved?_ |
-| 4 | Policy new version | _v? Default?_ |
+| 4 | Policy new version | Policy had 3 statements (OVERLYBROAD + 2 lab Denies). Added `Condition StringEquals bedrock-agentcore:ResourceTag/Owner = ${aws:PrincipalTag/Team}` to OVERLYBROAD only. _New default version = v?_ |
 | 5 | Check | _result_ |
+
+### Raw output: step 2 (13 Nov 2026)
+
+**`list-workload-identities`.** Every identity in the account. Useful for the other challenges:
+
+| Name | Owner agent (diagram) | Relevant to |
+|---|---|---|
+| `regulatory_reporting_runtime_b4183f00-97rzpCB6D8` | Regulatory reporting agent | F |
+| `trading-gateway-b4183f00-n4xfo3fdjk` | Trading gateway (partners) | D |
+| `portfolio-gateway-b4183f00-bevenwcrox` | A second gateway, maybe for portfolio tools ⚠️ | D? |
+| `client_advisor_runtime_b4183f00-jD0mCRBx4b` | Client advisor | A |
+| `portfolio_advisor_runtime_b4183f00-JSJfwQA6Al` | Portfolio advisor (log source on the diagram) | E |
+| `risk_assessment_runtime_b4183f00-icCH7oBUFo` | Risk team agent | **B** |
+| `trading_execution_runtime_b4183f00-EuAcruGnOa` | Trading/execution team agent | **B** |
+
+All ARNs follow `arn:aws:bedrock-agentcore:us-east-1:987347315034:workload-identity-directory/default/workload-identity/<name>`. There's **no compliance-agent identity yet**, which is what Challenge C creates. Gateway identities use **hyphens** (`trading-gateway-…`), runtime identities use underscores.
+
+```text
+$ echo "$RISK_ARN"; echo "$TRADE_ARN"
+arn:aws:bedrock-agentcore:us-east-1:987347315034:workload-identity-directory/default/workload-identity/risk_assessment_runtime_b4183f00-icCH7oBUFo
+arn:aws:bedrock-agentcore:us-east-1:987347315034:workload-identity-directory/default/workload-identity/trading_execution_runtime_b4183f00-EuAcruGnOa
+
+$ aws bedrock-agentcore-control list-tags-for-resource --resource-arn "$RISK_ARN"
+{
+    "tags": {
+        "aws:cloudformation:stack-name": "LabStack-b365c97a-70cf-45f3-afdd-07790a14df06-q3CQE9t75dyCr3XLH7AdbJ-0",
+        "aws:cloudformation:logical-id": "RiskAssessmentRuntime",
+        "Owner": "risk-team",
+        "aws:cloudformation:stack-id": "arn:aws:cloudformation:us-east-1:987347315034:stack/LabStack-…/b4183f00-df58-11f1-b9bb-0affc7ccc753"
+    }
+}
+$ aws bedrock-agentcore-control list-tags-for-resource --resource-arn "$TRADE_ARN"
+{
+    "tags": {
+        "aws:cloudformation:stack-name": "LabStack-b365c97a-70cf-45f3-afdd-07790a14df06-q3CQE9t75dyCr3XLH7AdbJ-0",
+        "aws:cloudformation:logical-id": "TradingExecutionRuntime",
+        "Owner": "execution-team",
+        "aws:cloudformation:stack-id": "arn:aws:cloudformation:us-east-1:987347315034:stack/LabStack-…/b4183f00-df58-11f1-b9bb-0affc7ccc753"
+    }
+}
+```
+
+**Note:** the identities already carried `aws:cloudformation:*` tags. "Untagged" in the card means *no ownership tag*. `tag-resource` **adds or merges** tags, so the CloudFormation tags stay.
