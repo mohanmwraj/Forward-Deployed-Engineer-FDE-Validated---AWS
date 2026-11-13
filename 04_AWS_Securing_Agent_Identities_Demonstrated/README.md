@@ -261,7 +261,7 @@ F  Auditors ─→ Lambda reporting-backend-lambda ─(JWT, was user-ID header)�
 
 | # | Obj | Challenge | Key services | Status | File |
 |---|---|---|---|---|---|
-| A | 4 | Configure a SigV4 path for the rebalancing service | Client advisor: JWT path untouched + IAM-auth path (second runtime from `client_advisor_agent.zip` ⚠️), `rebalance-handler-role` policy new version | ⬜ Not started | _—_ |
+| A | 4 | Configure a SigV4 path for the rebalancing service | `client_advisor_runtime` **new version without an authorizer** (same S3 code/settings), endpoint `internal_rebalance` → it, `advisor_portal` stays v1, Lambda `RUNTIME_ENDPOINT`, `InvokeRuntimePolicy` → runtime + endpoint ARNs (new default version) | 🟡 In progress | [Challenge_A](Challenge_A_SigV4_Path_Runtime_Version_Named_Endpoint_Scoped_Invoke_Policy.md) |
 | B | 1 | Restrict workload identity access by using tag-based access control | Workload identity tags (risk / trading), team-role policies **new version** with `aws:ResourceTag` condition | ⬜ Not started | _—_ |
 | C | 2 | Provision a workload identity for a self-hosted agent | AgentCore Identity (compliance audit agent), EC2 `compliance-agent-host` via Session Manager | ⬜ Not started | _—_ |
 | D | 3 | Configure scoped JWT authorization for inbound agent access | Trading **Gateway** Custom JWT (Partner pool, clients + scopes), `portfolio-api-handler` target + `portfolio_tools.json` | ⬜ Not started | _—_ |
