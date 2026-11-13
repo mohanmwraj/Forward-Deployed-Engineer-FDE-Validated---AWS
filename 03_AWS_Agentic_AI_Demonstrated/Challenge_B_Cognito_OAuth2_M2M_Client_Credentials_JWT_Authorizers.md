@@ -191,7 +191,7 @@ curl -s -X POST "https://supply-chain-8bc8fd20.auth.us-east-1.amazoncognito.com/
 
 ### Step 5: Chat handler Lambda env vars (AWS Lambda)
 
-**Where:** Console search → **Lambda** → **Functions** → search `chat` → the chat handler (suffix `8bc8fd20`) → **Configuration** tab → **Environment variables** → **Edit**
+**Where:** Console search → **Lambda** → **Functions** → **`supply-chain-chat-8bc8fd20`** (search `chat`) → **Configuration** tab → **Environment variables** → **Edit**
 
 | Key | Value |
 |---|---|

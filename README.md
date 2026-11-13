@@ -11,7 +11,7 @@
 |---|---|---|---|---|
 | 01 | [AWS Data Lakehouse Demonstrated](01_AWS_Data_Lakehouse_Demonstrated/README.md) | Glue, Iceberg, Athena, Lake Formation, Firehose, Step Functions | A ✅ · B ✅ · C ✅ · D ✅ · E ✅ · F ✅ · G ⚠️ | ✅ **PASSED** 11 Nov 2026 · valid to 11 Nov 2027 · renew from 8 Aug 2027 |
 | 02 | [AWS Databases for Agentic AI Demonstrated](02_AWS_Databases_For_Agentic_AI_Demonstrated/README.md) | Aurora PostgreSQL + pgvector, DynamoDB (agent memory), Bedrock Knowledge Bases, MCP servers, Lambda | A ✅ · B ✅ · C ✅ · D ✅ · E ✅ · F ✅ · G ✅ | ✅ **PASSED** 12 Nov 2026 · valid to 12 Nov 2027 · renew from 9 Aug 2027 |
-| 03 | [AWS Agentic AI Demonstrated](03_AWS_Agentic_AI_Demonstrated/README.md) | Bedrock AgentCore (Runtime, Gateway, Memory), Guardrails, Cognito OAuth 2.0, OpenSearch Serverless KB, Lambda, VPC | A 🟡 · B 🟡 · C ⬜ · D ⬜ · E ⬜ · F ⬜ | 🟡 in progress (started 13 Nov 2026) |
+| 03 | [AWS Agentic AI Demonstrated](03_AWS_Agentic_AI_Demonstrated/README.md) | Bedrock AgentCore (Runtime, Gateway, Memory), Guardrails, Cognito OAuth 2.0, OpenSearch Serverless KB, Lambda, VPC | A 🟡 · B 🟡 · C 🟡 · D ⬜ · E ⬜ · F ⬜ | 🟡 in progress (started 13 Nov 2026) |
 
 _New labs are added as `04_<Lab_Name>/`, `05_<Lab_Name>/` and so on._
 
